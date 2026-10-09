@@ -131,6 +131,98 @@ function renderRegions() {
 }
 document.addEventListener('click', (e) => { if (e.target.closest('[data-pick]')) openLocSheet(!S.locs.length); });
 
+// ---------- Alert ticker: a red strip pinned to the top of the screen ----------
+// Lists every active warning, watch and advisory for the counties you watch: the ones highlighted around your
+// active place plus your alarm counties (which cover all your saved places). Counties with the same alerts share
+// one entry, e.g. "Forrest & Lamar counties: Tropical Storm Warning · Flash Flood Watch".
+const tk = $('#aticker'), tkTrack = $('#tkTrack'), tkView = $('#tkView');
+const KIND_RANK = { warn: 0, watch: 1, adv: 2 };
+const evOrder = (a, b) => KIND_RANK[kind(a)] - KIND_RANK[kind(b)] || eventRank(a) - eventRank(b) || a.localeCompare(b);
+const ctySt = (c) => (CTY_BY_SAME.get(c) || {}).st || stateBySame(c) || '';
+let tkSig = '', tkAnim = null, tkCopy = '';
+function tickerGroups() {
+  if (!activeLoc()) return [];
+  const watched = new Set([...S.cty, ...REG.home]);
+  if (!watched.size) return [];
+  const now = Date.now();
+  const byCty = new Map();
+  for (const f of alertsAll) {
+    const p = f.properties;
+    if (SKIP_EVENTS.has(p.event)) continue;
+    const end = p.ends || p.expires;
+    if (end && Date.parse(end) < now) continue;
+    for (const c of sameOf(f)) if (watched.has(c)) { if (!byCty.has(c)) byCty.set(c, new Set()); byCty.get(c).add(p.event); }
+  }
+  const groups = new Map();
+  for (const [c, set] of byCty) {
+    const evs = [...set].sort(evOrder), st = ctySt(c), key = `${st}|${evs.join('|')}`;
+    if (!groups.has(key)) groups.set(key, { st, evs, ctys: [] });
+    groups.get(key).ctys.push(c);
+  }
+  const list = [...groups.values()];
+  const multi = new Set(list.map((g) => g.st)).size > 1;
+  for (const g of list) {
+    g.ctys.sort((a, b) => ctyName(a).localeCompare(ctyName(b)));
+    g.where = (g.ctys.length === 1 ? ctyLabel(g.ctys[0], { long: true, state: false }) : countyList(g.ctys)) + (multi && g.st ? `, ${g.st}` : '');
+  }
+  return list.sort((a, b) => evOrder(a.evs[0], b.evs[0]) || b.evs.length - a.evs.length || a.where.localeCompare(b.where));
+}
+function renderTicker() {
+  const groups = tickerGroups();
+  const sig = JSON.stringify(groups.map((g) => [g.where, g.evs]));
+  if (sig === tkSig) return;
+  tkSig = sig;
+  const show = groups.length > 0;
+  tk.hidden = !show;
+  document.documentElement.classList.toggle('has-tk', show);
+  if (!show) { stopTicker(); tkTrack.innerHTML = ''; syncTickerHeight(); return; }
+  const warn = groups.some((g) => g.evs.some((ev) => kind(ev) === 'warn'));
+  tk.classList.toggle('has-warn', warn);
+  $('#tkCount').textContent = String(new Set(groups.flatMap((g) => g.evs)).size);
+  tk.setAttribute('aria-label', `Active alerts for your counties: ${groups.map((g) => `${g.where}: ${g.evs.join(', ')}`).join('; ')}. Show details.`);
+  tk.title = 'Show the details below';
+  tkCopy = groups.map((g) => `<span class="tk-seg"><span class="tk-where">${esc(g.where)}:</span>${g.evs.map((ev) => `<span class="tk-ev tk-${kind(ev)}">${esc(ev)}</span>`).join('<span class="tk-dot">·</span>')}</span>`).join('');
+  syncTickerHeight();
+  layoutTicker();
+}
+function stopTicker() { if (tkAnim) { tkAnim.cancel(); tkAnim = null; } }
+const REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)');
+function layoutTicker() {
+  if (tk.hidden || !tkCopy) return;
+  stopTicker();
+  // Measure one copy, then repeat it enough times to fill the strip and loop seamlessly.
+  tkTrack.innerHTML = `<span class="tk-copy">${tkCopy}</span>`;
+  if (REDUCED.matches) { tk.classList.add('is-still'); return; }
+  tk.classList.remove('is-still');
+  const w = tkTrack.firstElementChild.getBoundingClientRect().width;
+  const view = tkView.clientWidth;
+  if (!w || !view) return;
+  const copies = Math.max(2, Math.ceil(view / w) + 1);
+  tkTrack.innerHTML = Array.from({ length: copies }, (_, i) => `<span class="tk-copy"${i ? ' aria-hidden="true"' : ''}>${tkCopy}</span>`).join('');
+  const speed = PHONE_TK.matches ? 46 : 58; // px per second: slow enough to read
+  tkAnim = tkTrack.animate([{ transform: 'translateX(0)' }, { transform: `translateX(${-w}px)` }], { duration: (w / speed) * 1000, iterations: Infinity });
+  if (tkHover) tkAnim.pause();
+}
+const PHONE_TK = window.matchMedia('(max-width: 760px)');
+let tkHover = false;
+function syncTickerHeight() {
+  document.documentElement.style.setProperty('--tk-h', tk.hidden ? '0px' : `${tk.offsetHeight}px`);
+  if (typeof syncBannerOffset === 'function') syncBannerOffset();
+}
+tk.addEventListener('mouseenter', () => { tkHover = true; if (tkAnim) tkAnim.pause(); });
+tk.addEventListener('mouseleave', () => { tkHover = false; if (tkAnim) tkAnim.play(); });
+tk.addEventListener('click', (e) => {
+  e.preventDefault();
+  const target = $('#regionLoc');
+  if (target) target.scrollIntoView({ behavior: REDUCED.matches ? 'auto' : 'smooth', block: 'start' });
+});
+let tkResize = null;
+window.addEventListener('resize', () => { clearTimeout(tkResize); tkResize = setTimeout(() => { syncTickerHeight(); layoutTicker(); }, 200); });
+REDUCED.addEventListener?.('change', layoutTicker);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { syncTickerHeight(); layoutTicker(); });
+// Keep moving after the page comes back from the background (iOS can drop running animations).
+document.addEventListener('visibilitychange', () => { if (!document.hidden && tkAnim && tkAnim.playState !== 'running' && !tkHover) layoutTicker(); });
+
 // ---------- Tornadoes ----------
 let testMode = false;
 let currentHomeIds = new Set();
@@ -205,6 +297,7 @@ function fakeTornado() {
 }
 const sirenNames = () => S.cty.map((c) => ctyLabel(c, { state: false })).join(' / ');
 function renderTornado() {
+  renderTicker();
   const ids = new Set();
   let tors = [...alertsAll, ...torExtra].filter((f) => f.properties.event === 'Tornado Warning' && !ids.has(f.properties.id) && ids.add(f.properties.id));
   const ext = S.extra['Extreme Wind Warning'] ? alertsAll.filter((f) => f.properties.event === 'Extreme Wind Warning' && sameOf(f).some((c) => S.cty.includes(c))) : [];
@@ -857,7 +950,8 @@ function syncMini() {
 }
 function syncBannerOffset() {
   const b = $('#homeBanner');
-  const h = b.hidden ? 0 : Math.max(0, b.getBoundingClientRect().bottom);
+  let h = b.hidden ? 0 : Math.max(0, b.getBoundingClientRect().bottom);
+  if (!tk.hidden) h = Math.max(h, tk.getBoundingClientRect().bottom); // the alert ticker sits above everything
   document.documentElement.style.setProperty('--hb-h', `${h}px`);
   document.documentElement.style.setProperty('--mini-pad', h ? '0px' : 'calc(env(safe-area-inset-top, 0px) + var(--pwa-top, 0px))');
 }

@@ -331,3 +331,55 @@ body.sheet-open { overflow: hidden; }
 }
 /* Safety net: no stray wide element can ever make a phone page scroll sideways. */
 @media (max-width: 760px) { body { overflow-x: clip; } }
+
+/* ===== Alert ticker: pinned to the very top, scrolls your counties' active alerts ===== */
+.aticker {
+  position: sticky; top: 0; z-index: 1001; display: flex; align-items: stretch;
+  margin: calc(-1 * (env(safe-area-inset-top, 0px) + var(--pwa-top, 0px))) -16px 0;
+  padding-top: calc(env(safe-area-inset-top, 0px) + var(--pwa-top, 0px));
+  background: #a30d0d; color: #fff; text-decoration: none; border-bottom: 1px solid #ff6b5b;
+  box-shadow: 0 4px 14px rgba(0,0,0,.35); -webkit-tap-highlight-color: transparent; cursor: pointer;
+}
+.aticker[hidden] { display: none !important; }
+.tk-k {
+  flex: none; display: flex; align-items: center; gap: 7px; padding: 0 12px 0 16px; background: #6d0606;
+  font: 600 12px/1 var(--font-body); text-transform: uppercase; letter-spacing: .1em; white-space: nowrap;
+}
+.tk-ico { flex: none; }
+.aticker.has-warn .tk-ico { color: #ffd34d; }
+.tk-n { display: inline-grid; place-items: center; min-width: 19px; height: 19px; padding: 0 5px; border-radius: 999px; background: #fff; color: #8a0b0b; font: 700 11px/1 var(--font-mono); letter-spacing: 0; }
+.tk-view {
+  flex: 1 1 auto; min-width: 0; overflow: hidden; display: flex; align-items: center; height: 34px;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%);
+}
+.tk-track { display: flex; flex: none; white-space: nowrap; will-change: transform; }
+.tk-copy { display: flex; flex: none; }
+.tk-seg { display: inline-flex; align-items: center; gap: 7px; padding: 0 16px; font: 500 13.5px/1 var(--font-body); border-right: 1px solid rgba(255,255,255,.45); }
+.tk-where { font-weight: 700; letter-spacing: .01em; }
+.tk-ev { opacity: .95; }
+.tk-warn { font-weight: 700; text-transform: uppercase; letter-spacing: .04em; font-size: 12.5px; opacity: 1; }
+.tk-dot { opacity: .6; }
+.aticker:hover .tk-view, .aticker:focus-visible .tk-view { background: rgba(0,0,0,.08); }
+.aticker:focus-visible { outline: 2px solid #fff; outline-offset: -3px; }
+/* Reduced motion: no scrolling; swipe the strip instead */
+.aticker.is-still .tk-view { overflow-x: auto; scrollbar-width: none; -webkit-mask-image: none; mask-image: none; }
+.aticker.is-still .tk-view::-webkit-scrollbar { display: none; }
+@media (prefers-reduced-motion: no-preference) { .aticker.has-warn .tk-ico { animation: tk-pulse 1.6s ease-in-out infinite; } }
+@keyframes tk-pulse { 50% { opacity: .35; } }
+
+/* Everything else that pins to the top sits below the ticker */
+html.has-tk .home-banner { top: var(--tk-h, 0px); padding-top: 0; }
+html.has-tk .topbar { top: var(--tk-h, 0px); }
+html.has-tk .region { scroll-margin-top: calc(96px + var(--tk-h, 0px)); }
+html.has-tk .toast { top: calc(14px + var(--tk-h, 0px)); }
+html.has-tk body.tip-open .update-pill { top: calc(12px + var(--tk-h, 0px)); }
+@media (max-width: 760px) {
+  .tk-k { padding: 0 10px 0 16px; }
+  .tk-view { height: 32px; }
+  .tk-seg { font-size: 13px; padding: 0 14px; }
+  .tk-warn { font-size: 12px; }
+  html.has-tk .topbar { top: auto; }
+  html.has-tk .region { scroll-margin-top: calc(58px + var(--tk-h, 0px)); }
+  html.has-tk .toast { top: auto; }
+}
