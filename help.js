@@ -120,8 +120,8 @@
       // One card at a time, in the order the buttons appear on the page; each one scrolls its button into view.
       queue.push(() => alarmTip(true));
       if (S.locs.length) queue.push(() => watchTip(true));
-      if (window.iwXTip) queue.push(() => window.iwXTip(next, true));
       queue.push(() => layersTip(true));
+      if (window.iwXTip) queue.push(() => window.iwXTip(next, true)); // the X feed is the last section on phones
       window.scrollTo({ top: 0, behavior: 'smooth' });
       setTimeout(next, 350);
     } else {

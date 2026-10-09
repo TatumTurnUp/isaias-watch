@@ -35,7 +35,7 @@
 .x-opts .ex { padding: 8px 4px; }
 .x-reset { margin-left: 8px; }
 @media (max-width: 760px) {
-  .card-x { order: 1; } /* right after Conditions now (same order, later in the page) */
+  .card-x { order: 99; } /* phones: last section on the page (desktop keeps it under Conditions now) */
   .xfeed { max-height: none; }
   .xp-m, .xp-m img { max-height: 210px; }
 }
