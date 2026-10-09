@@ -78,7 +78,8 @@ function showFrame(i) {
   radarFrames.forEach((l, j) => l.setOpacity(on && j === i ? 0.78 : 0));
   slider.value = i;
   const t = new Date(Math.floor((radarStamp - 5 * 60000) / 300000) * 300000 - OFFSETS[i] * 60000);
-  $('#frameTime').textContent = `${fmtTime(t)}${i === OFFSETS.length - 1 ? ' · latest' : ''}`;
+  // Same width on every frame (the "latest" tag keeps its space when hidden), so the bar never reflows mid-loop.
+  $('#frameTime').innerHTML = `${dual(fmtTime(t), shortTime(t))}<span class="ft-tag"${i === OFFSETS.length - 1 ? '' : ' data-off'}>latest</span>`;
 }
 showFrame(frame);
 let loopTimer = null;

@@ -284,3 +284,16 @@ body.sheet-open { overflow: hidden; }
   #sPass, [data-s="sPass"] { white-space: normal; }
 }
 .cities-far .city:not(.is-pinned):not(.is-open) { display: none; }
+
+/* Radar bar: the frame time keeps the same width on every frame (the "latest" tag holds its space when hidden),
+   so the loop never re-wraps the bar. */
+.frame-time { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.frame-time .lg { display: inline-block; min-width: 23ch; }
+.ft-tag { font: 600 10px/1 var(--font-body); letter-spacing: .06em; text-transform: uppercase; padding: 3px 5px; border-radius: 3px; background: var(--accent-dim); color: #bfeef7; }
+.ft-tag[data-off] { visibility: hidden; }
+@media (max-width: 760px) {
+  .map-bar input[type=range] { flex: 1 1 0; min-width: 60px; }
+  .frame-time { flex: none; min-width: 0; }
+  .frame-time .sh { display: inline-block; min-width: 8ch; text-align: right; }
+  .layer-toggles { flex-basis: 100%; }
+}

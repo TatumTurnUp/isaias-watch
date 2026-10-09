@@ -11,6 +11,22 @@ const store = {
   set() { try { if (window.IW) IW.tipDone('install'); else localStorage.setItem('iw.installTip', '1'); } catch (e) {} },
 };
 
+// One-tap "Install app" button for Android Chrome (also used when Help brings the tip back).
+// Chrome can replace its install offer at any time, so the button always uses the newest one at tap time.
+window.iwOfferInstall = function (tip, onInstalled) {
+  if (!window.__bip || !tip || tip.querySelector('.it-install')) return;
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'it-install'; b.textContent = 'Install app';
+  b.addEventListener('click', async () => {
+    const ev = window.__bip;
+    if (!ev) { b.textContent = 'Use Chrome’s ⋮ menu › Install app'; b.disabled = true; return; }
+    window.__bip = null;
+    try { await ev.prompt(); const r = await ev.userChoice; if (r && r.outcome === 'accepted' && onInstalled) onInstalled(); } catch (e) {}
+    b.remove();
+  });
+  tip.appendChild(b);
+};
+
 // ---------- Add to Home Screen tip (shows until closed; never inside the installed app) ----------
 (function installTip() {
   if (STANDALONE || !(IOS || ANDROID) || store.get()) return;
@@ -25,17 +41,7 @@ const store = {
   const top = document.getElementById('topbar');
   top.parentNode.insertBefore(tip, top);
   // Android Chrome: offer a one-tap Install button when the browser allows it.
-  function offerInstall() {
-    const ev = window.__bip;
-    if (!ev || tip.querySelector('.it-install') || !tip.isConnected) return;
-    const b = document.createElement('button');
-    b.type = 'button'; b.className = 'it-install'; b.textContent = 'Install app';
-    b.addEventListener('click', async () => {
-      try { ev.prompt(); const r = await ev.userChoice; if (r && r.outcome === 'accepted') close(); } catch (e) {}
-      window.__bip = null; b.remove();
-    });
-    tip.appendChild(b);
-  }
+  function offerInstall() { if (tip.isConnected) window.iwOfferInstall(tip, close); }
   offerInstall();
   document.addEventListener('bip', offerInstall);
   window.addEventListener('appinstalled', close);

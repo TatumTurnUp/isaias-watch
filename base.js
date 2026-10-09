@@ -243,7 +243,11 @@ function save() {
   try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {}
   const packed = S.locs.length ? b64e(packState()) : null;
   // Start URL for "Add to Home Screen" / "Install app".
-  manifestLink.href = packed ? `/api/watch?src=manifest&s=${packed}` : '/manifest.webmanifest';
+  // iPhone only: Safari has no install prompt and keeps no storage for Home Screen apps, so the places ride along
+  // in the manifest's start URL. Android installs share Chrome's storage, and swapping the manifest there makes
+  // Chrome's pending install offer go stale, so Android (and everything else) keeps the one static manifest.
+  const want = packed && UA_IOS ? `/api/watch?src=manifest&s=${packed}` : '/manifest.webmanifest';
+  if (manifestLink.getAttribute('href') !== want) manifestLink.href = want;
   // iPhone Safari copies the current address when adding to the Home Screen.
   try {
     const clean = location.pathname + (location.search.replace(/[?&]s=[^&]*/, '').replace(/^&/, '?') || '');
@@ -553,21 +557,31 @@ $('#locAdd').addEventListener('click', () => openLocSheet());
 
 // ---------- Sheets ----------
 let openSheetEl = null, lastFocus = null;
+// An open panel gets its own history entry, so Android's back gesture (and the browser Back button) closes the
+// panel instead of leaving the page.
+let sheetHist = false, backPending = false;
 function openSheet(id) {
-  closeSheet();
+  closeSheet(true);
   const el = $('#' + id);
   lastFocus = document.activeElement;
   el.hidden = false; openSheetEl = el;
   document.body.classList.add('sheet-open');
   const f = el.querySelector('[data-autofocus]') || el.querySelector('.sheet-x');
   setTimeout(() => { if (!TOUCH && f) f.focus(); }, 30);
+  if (!sheetHist) { try { history.pushState({ iwSheet: 1 }, '', location.href); sheetHist = true; } catch (e) {} }
 }
-function closeSheet() {
+function closeSheet(keepHistory) {
   if (!openSheetEl) return;
   openSheetEl.hidden = true; openSheetEl = null;
   document.body.classList.remove('sheet-open');
   if (lastFocus && lastFocus.focus) try { lastFocus.focus({ preventScroll: true }); } catch (e) {}
+  if (sheetHist && keepHistory !== true) { sheetHist = false; backPending = true; try { history.back(); } catch (e) { backPending = false; } }
 }
+window.addEventListener('popstate', () => {
+  if (backPending) backPending = false;               // our own step back after closing a panel
+  else if (sheetHist) { sheetHist = false; closeSheet(true); } // the back gesture: close the panel
+  setTimeout(save, 0); // re-stamp the saved places into the address (iPhone Home Screen) after the history step
+});
 $$('.sheet').forEach((sh) => sh.addEventListener('click', (e) => { if (e.target === sh || e.target.closest('[data-close]')) closeSheet(); }));
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && openSheetEl) closeSheet(); });
 
@@ -845,7 +859,7 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').cat
 async function notify(title, body, tag) {
   try {
     if (!('Notification' in window) || Notification.permission !== 'granted') return;
-    const opts = { body, tag, requireInteraction: true, vibrate: [500, 250, 500, 250, 900], icon: '/icon-192.png', badge: '/icon-192.png' };
+    const opts = { body, tag, requireInteraction: true, vibrate: [500, 250, 500, 250, 900], icon: '/icon-192.png', badge: '/icons/badge-96.png' };
     const reg = navigator.serviceWorker ? await navigator.serviceWorker.getRegistration() : null;
     if (reg) await reg.showNotification(title, opts); else new Notification(title, opts);
   } catch (e) {}

@@ -3,8 +3,8 @@
 // 2) Keeps a copy of the page itself so the home-screen app still opens on a weak storm-time signal.
 //    Always tries the network first, so what you see is live whenever there is any connection.
 //    Weather data (NWS, NHC, radar, /api) is never cached here.
-const CACHE = 'iw-shell-v3';
-const SHELL = ['/', '/style.css', '/mobile.css', '/watch.css', '/help.css', '/base.js', '/core.js', '/alerts.js', '/help.js', '/x.css', '/x.js', '/places.js', '/share.js', '/pwa.js', '/icon-192.png'];
+const CACHE = 'iw-shell-v4';
+const SHELL = ['/', '/style.css', '/mobile.css', '/watch.css', '/help.css', '/base.js', '/core.js', '/alerts.js', '/help.js', '/x.css', '/x.js', '/places.js', '/share.js', '/pwa.js', '/icon-192.png', '/icons/badge-96.png'];
 self.addEventListener('install', (e) => {
   self.skipWaiting();
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).catch(() => {}));

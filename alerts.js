@@ -28,6 +28,28 @@ function areaStates() {
   for (const same of S.cty) { const st = stateBySame(same); if (st) set.add(st); }
   return set.size ? [...set].sort() : DEFAULT_AREA;
 }
+// Tornado warnings are listed for every state the storm threatens (any hurricane, tropical storm or storm surge
+// watch or warning), not only the states around your places. Those extra states get their own small query so the
+// map doesn't have to draw every zone in them.
+const US_ST = new Set(Object.values(ABBR));
+const TROPICAL = ['Hurricane Warning', 'Hurricane Watch', 'Tropical Storm Warning', 'Tropical Storm Watch', 'Storm Surge Warning', 'Storm Surge Watch'];
+let stormStates = [...DEFAULT_AREA];
+let torExtra = [];
+async function loadStormStates() {
+  const d = await getJSON(`https://api.weather.gov/alerts/active?event=${TROPICAL.map(encodeURIComponent).join(',')}`, { headers: NWS_HEADERS });
+  const set = new Set();
+  for (const f of d.features || []) for (const u of f.properties.geocode?.UGC || []) { const st = u.slice(0, 2); if (US_ST.has(st)) set.add(st); }
+  if (set.size) stormStates = [...set].sort();
+}
+const orList = (a) => (a.length < 2 ? a.join('') : `${a.slice(0, -1).join(', ')} or ${a[a.length - 1]}`);
+const torStates = () => [...new Set([...areaStates(), ...stormStates])].sort();
+async function loadTornadoExtra() {
+  const have = new Set(areaStates());
+  const extra = stormStates.filter((st) => !have.has(st));
+  if (!extra.length) { torExtra = []; return; }
+  const d = await getJSON(`https://api.weather.gov/alerts/active?event=${encodeURIComponent('Tornado Warning')}&area=${extra.join(',')}`, { headers: NWS_HEADERS });
+  torExtra = dedupe(d.features || []);
+}
 async function loadAlerts() {
   const area = areaStates().join(',');
   try {
@@ -41,6 +63,7 @@ async function loadAlerts() {
     }
     seenAlertIds = new Set([...(seenAlertIds || []), ...ids]);
     alertsOkAt = Date.now();
+    try { await loadTornadoExtra(); } catch (e) { /* keep the last list */ }
     renderRegions(); renderTornado(); drawWarnings(); checkExtras();
     mark('alerts', true, 'NWS alerts');
   } catch (e) { mark('alerts', false, 'NWS alerts'); throw e; } finally { renderStatus(); }
@@ -180,15 +203,16 @@ function fakeTornado() {
 }
 const sirenNames = () => S.cty.map((c) => ctyLabel(c, { state: false })).join(' / ');
 function renderTornado() {
-  let tors = alertsAll.filter((f) => f.properties.event === 'Tornado Warning');
+  const ids = new Set();
+  let tors = [...alertsAll, ...torExtra].filter((f) => f.properties.event === 'Tornado Warning' && !ids.has(f.properties.id) && ids.add(f.properties.id));
   const ext = S.extra['Extreme Wind Warning'] ? alertsAll.filter((f) => f.properties.event === 'Extreme Wind Warning' && sameOf(f).some((c) => S.cty.includes(c))) : [];
   if (testMode) tors = [fakeTornado(), ...tors];
   const rows = tors.map((f) => ({ f, ...tornadoTier(f) }))
     .sort((a, b) => TIER_RANK[a.tier] - TIER_RANK[b.tier] || (b.f.properties.sent > a.f.properties.sent ? 1 : -1));
-  const area = areaStates();
+  const area = torStates();
   const loc = activeLoc();
   $('#torSubLg').textContent = `${area.join(', ')} warnings · ${S.cty.length ? 'alarm for ' + sirenNames() : 'no alarm counties yet'}`;
-  $('#torSubSh').textContent = area.join(' & ');
+  $('#torSubSh').textContent = area.join(', ');
   const realCount = tors.length - (testMode ? 1 : 0);
   const tc = $('#torCount');
   tc.textContent = `${realCount} active`;
@@ -214,7 +238,7 @@ function renderTornado() {
 
   const list = $('#torList');
   if (!rows.length) {
-    list.innerHTML = `<div class="empty calm">${dual(`No tornado warnings in ${area.join(', ')} right now.`, `No tornado warnings in ${area.join(' or ')}.`)}</div>`;
+    list.innerHTML = `<div class="empty calm">${dual(`No tornado warnings in ${orList(area)} right now.`, `No tornado warnings in ${orList(area)}.`)}</div>`;
   } else {
     list.innerHTML = rows.map(({ f, tier, nt }) => {
       const p = f.properties;
@@ -534,38 +558,53 @@ async function stationsFor(loc) {
 function stationLabel(name) {
   return String(name || '').split(',')[0].replace(/\b(Regional|Municipal|International|Intl|County|Airport|Arpt|Field|Fld)\b/gi, '').replace(/\s{2,}/g, ' ').replace(/[-\s]+$/, '').trim();
 }
+let obsRetry = null;
 async function loadObs() {
   const loc = activeLoc();
   if (!loc) { renderObsEmpty(); return; }
+  clearTimeout(obsRetry);
+  // Never leave "Pick your place" up while a place's conditions are on their way.
+  if (!$('#obs .ob:not(.ob-empty)') || $('#obs').dataset.loc !== loc.id) {
+    $('#obs').innerHTML = `<div class="ob"><div class="ob-name">${esc(loc.short)}</div><div class="ob-rest">Loading the latest observations…</div><div class="ob-flood"></div></div>`;
+    $('#obs').classList.add('is-one');
+  }
+  $('#obs').dataset.loc = loc.id;
   try {
     const stations = await stationsFor(loc);
+    // Ask the nearest stations at once (the weather service can be slow during a storm), then keep the first two with a fresh reading.
+    const got = await Promise.all(stations.slice(0, 4).map((st) => getJSON(`https://api.weather.gov/stations/${st.id}/observations/latest`, { headers: NWS_HEADERS }).then((d) => ({ st, p: d.properties })).catch(() => null)));
+    if (activeLoc() !== loc) return; // switched places meanwhile
     const cards = [];
-    for (const st of stations) {
-      if (cards.length >= 2) break;
-      try {
-        const d = await getJSON(`https://api.weather.gov/stations/${st.id}/observations/latest`, { headers: NWS_HEADERS });
-        const p = d.properties;
-        if (!p || p.windSpeed?.value == null) continue;
-        if (Date.now() - new Date(p.timestamp).getTime() > 3 * 3600e3) continue;
-        const kmh = (v) => (v == null ? null : Math.round(v * 0.621371));
-        const ws = kmh(p.windSpeed.value), wg = kmh(p.windGust?.value);
-        const dir = p.windDirection?.value;
-        const t = p.temperature?.value; const f = t == null ? null : Math.round(t * 9 / 5 + 32);
-        const mb = p.barometricPressure?.value ? (p.barometricPressure.value / 100).toFixed(1) : null;
-        const dist = Math.round(miles(loc, st));
-        const title = cards.length === 0 ? loc.short : stationLabel(st.name) || st.id;
-        cards.push(`<div class="ob"><div class="ob-name">${esc(title)}</div><div class="ob-sid">${esc(st.id)}${dist >= 2 ? ` · ${dist} mi away` : ''} · ${dual(fmtTime(p.timestamp), shortTime(p.timestamp))}</div>
-          <div class="ob-wind">${dir == null || ws === 0 ? '' : esc(compass(dir)) + ' '}${ws} mph${wg ? ` <small>gust ${wg}</small>` : ''}</div>
-          <div class="ob-rest">${esc(p.textDescription || '')}${f != null ? ` · ${f}°F` : ''}${mb ? ` · ${mb} mb` : ''}</div>
-          ${cards.length === 0 ? '<div class="ob-flood"></div>' : ''}</div>`);
-      } catch (e) { /* next station */ }
+    for (const g of got) {
+      if (!g || cards.length >= 2) continue;
+      const { st, p } = g;
+      if (!p || p.windSpeed?.value == null) continue;
+      if (Date.now() - new Date(p.timestamp).getTime() > 3 * 3600e3) continue;
+      const kmh = (v) => (v == null ? null : Math.round(v * 0.621371));
+      const ws = kmh(p.windSpeed.value), wg = kmh(p.windGust?.value);
+      const dir = p.windDirection?.value;
+      const t = p.temperature?.value; const f = t == null ? null : Math.round(t * 9 / 5 + 32);
+      const mb = p.barometricPressure?.value ? (p.barometricPressure.value / 100).toFixed(1) : null;
+      const dist = Math.round(miles(loc, st));
+      const title = cards.length === 0 ? loc.short : stationLabel(st.name) || st.id;
+      cards.push(`<div class="ob"><div class="ob-name">${esc(title)}</div><div class="ob-sid">${esc(st.id)}${dist >= 2 ? ` · ${dist} mi away` : ''} · ${dual(fmtTime(p.timestamp), shortTime(p.timestamp))}</div>
+        <div class="ob-wind">${dir == null || ws === 0 ? '' : esc(compass(dir)) + ' '}${ws} mph${wg ? ` <small>gust ${wg}</small>` : ''}</div>
+        <div class="ob-rest">${esc(p.textDescription || '')}${f != null ? ` · ${f}°F` : ''}${mb ? ` · ${mb} mb` : ''}</div>
+        ${cards.length === 0 ? '<div class="ob-flood"></div>' : ''}</div>`);
     }
-    if (!cards.length) cards.push(`<div class="ob"><div class="ob-name">${esc(loc.short)}</div><div class="ob-rest">No recent observation from nearby stations.</div><div class="ob-flood"></div></div>`);
+    if (!cards.length) {
+      cards.push(`<div class="ob"><div class="ob-name">${esc(loc.short)}</div><div class="ob-rest">No recent reading from nearby stations yet. Trying again shortly.</div><div class="ob-flood"></div></div>`);
+      obsRetry = setTimeout(() => kickObs(), 45000);
+    }
     $('#obs').innerHTML = cards.join('');
     $('#obs').classList.toggle('is-one', cards.length === 1);
     renderFlood();
     mark('obs', true, 'Observations');
-  } catch (e) { mark('obs', false, 'Observations'); throw e; }
+  } catch (e) {
+    mark('obs', false, 'Observations');
+    obsRetry = setTimeout(() => kickObs(), 30000); // don't wait the full 5 minutes after a hiccup
+    throw e;
+  }
 }
 async function loadHourly() {
   const loc = activeLoc();
@@ -695,7 +734,7 @@ function renderCountyPicker() {
   $('#ctyNear').innerHTML = REG.list.slice(0, 30).map((c) => `<button type="button" class="cty-opt${S.cty.includes(c.same) ? ' is-on' : ''}" data-tog="${c.same}" aria-pressed="${S.cty.includes(c.same)}">${esc(c.name)} <small>${c.d < 1 ? 'here' : Math.round(c.d) + ' mi'}${c.st !== (loc && loc.st) ? ' · ' + c.st : ''}</small></button>`).join('');
 }
 $('#ctyPicked').addEventListener('click', (e) => { const b = e.target.closest('[data-rm]'); if (b) removeCounty(b.dataset.rm); });
-$('#ctyNearLabel').addEventListener('click', (e) => { if (e.target.closest('[data-chgplace]')) { closeSheet(); openLocSheet(!S.locs.length, true); } });
+$('#ctyNearLabel').addEventListener('click', (e) => { if (e.target.closest('[data-chgplace]')) openLocSheet(!S.locs.length, true); /* swaps panels in place */ });
 $('#ctyNear').addEventListener('click', (e) => {
   const b = e.target.closest('[data-tog]');
   if (!b) return;
@@ -996,6 +1035,8 @@ let lastBack = Date.now();
   try { await loadStorm(); } catch (e) {}
   kickStorm = every(2 * 60 * 1000, async () => { await loadStorm(); setWindy(); renderSaved(); });
   setWindy();
+  try { await loadStormStates(); } catch (e) {}
+  every(10 * 60 * 1000, () => loadStormStates().catch(() => {}));
   kickAlerts = every(60 * 1000, loadAlerts);
   kickObs = every(5 * 60 * 1000, loadObs);
   kickHourly = every(30 * 60 * 1000, loadHourly);

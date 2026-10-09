@@ -88,9 +88,11 @@
     const tip = document.createElement('div');
     tip.className = 'install-tip'; tip.setAttribute('role', 'note');
     tip.innerHTML = `${X}<b>Use it like an app</b>${how}`;
-    tip.querySelector('.layer-tip-x').addEventListener('click', () => { tip.remove(); S.tips.install = 1; save(); });
+    const close = () => { tip.remove(); S.tips.install = 1; save(); };
+    tip.querySelector('.layer-tip-x').addEventListener('click', close);
     const top = $('#topbar');
     top.parentNode.insertBefore(tip, top);
+    if (ANDROID && window.iwOfferInstall) window.iwOfferInstall(tip, close);
   }
 
   // First visit: once a place is picked, explain the place bar, then the alarm.
