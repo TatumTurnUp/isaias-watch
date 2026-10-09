@@ -38,6 +38,4 @@
   .card-x { order: 1; } /* right after Conditions now (same order, later in the page) */
   .xfeed { max-height: none; }
   .xp-m, .xp-m img { max-height: 210px; }
-  .card-x .help-tip.tip-right { left: auto; right: 0; }
-  .card-x .help-tip.tip-right::after { left: auto; right: 40px; }
 }

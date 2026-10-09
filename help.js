@@ -12,52 +12,69 @@
   }
 
   // Tips that point at the header take turns, so on a phone they never stack on top of each other.
+  const PHONE = window.matchMedia('(max-width: 760px)');
   const queue = [];
   let showing = null;
   function next() {
     if (showing && showing.isConnected) return;
     showing = null;
-    const job = queue.shift();
-    if (job) showing = job();
+    // Phones show one card at a time: if another card (the X feed's) is up, wait for it.
+    if (PHONE.matches && queue.length && document.querySelector('.help-tip.tip-sheet')) { setTimeout(next, 1200); return; }
+    while (!showing && queue.length) showing = queue.shift()();
   }
-  function makeTip(key, anchor, cls, html, onClose) {
+  // Phones: a tip is a card pinned to the bottom of the screen (so its × is always reachable), and the
+  // button it explains gets a highlight. Wider screens: a speech bubble attached to the button.
+  const syncOpen = () => document.body.classList.toggle('tip-open', !!document.querySelector('.help-tip.tip-sheet'));
+  function makeTip(key, anchor, cls, html, onClose, focus = false) {
     if (!anchor) return null;
     $$(`.help-tip[data-tip="${key}"]`).forEach((t) => t.remove());
     const tip = document.createElement('div');
-    tip.className = `layer-tip help-tip ${cls}`;
+    const sheet = PHONE.matches;
+    tip.className = `layer-tip help-tip ${cls}${sheet ? ' tip-sheet' : ''}`;
     tip.dataset.tip = key;
     tip.setAttribute('role', 'note');
     tip.innerHTML = X + html;
-    anchor.appendChild(tip);
+    if (sheet) {
+      document.body.appendChild(tip);
+      anchor.classList.add('tip-target');
+      // Bring the button into the top part of the screen, clear of the card.
+      if (focus) setTimeout(() => window.scrollBy({ top: anchor.getBoundingClientRect().top - window.innerHeight * 0.22, behavior: 'smooth' }), 60);
+      syncOpen();
+    } else anchor.appendChild(tip);
+    const done = () => { anchor.classList.remove('tip-target'); syncOpen(); };
     tip.querySelector('.layer-tip-x').addEventListener('click', () => {
-      tip.remove(); S.tips[key] = 1; save();
+      tip.remove(); S.tips[key] = 1; save(); done();
       if (onClose) onClose();
     });
+    tip.addEventListener('iw:gone', done);
     return tip;
   }
+  // x.js (the X feed) uses the same tips.
+  window.iwTips = { make: makeTip, busy: () => !!document.querySelector('.help-tip.tip-sheet') };
 
-  function alarmTip() {
+  function alarmTip(focus) {
     return makeTip('alarm', $('.siren-ctl'), 'tip-below tip-right',
       '<b>Your tornado alarm</b>' +
       '<p>Tap <b>Turn on alarm</b> each time you open the page. Browsers block sound until you tap once.</p>' +
       '<p>When a tornado warning covers one of your alarm counties, the alarm sounds, a red banner flashes and a notification is sent. Tap <b>Silence alarm</b> on the banner to stop it.</p>' +
       '<p><b>Test</b> plays your alarm with a sample banner for 8 seconds. It only happens on this device.</p>' +
-      '<p>Change the counties, the sound and notifications in <b>Alert settings</b>, next to your places.</p>', next);
+      '<p>Change the counties, the sound and notifications in <b>Alert settings</b>, next to your places.</p>', next, focus === true);
   }
-  function watchTip() {
+  function watchTip(focus) {
     if (!S.locs.length) return null;
     return makeTip('watch', $('#locBar'), 'tip-below tip-left',
       '<b>Your places</b>' +
       '<p>Tap a place to switch the whole dashboard to it. <b>+ Add</b> adds another, like where family lives.</p>' +
       '<p>To remove the highlighted place, tap its <b>▾</b>. In <b>+ Add</b>, each saved place has an ✕.</p>' +
-      '<p>Wrong city? A VPN can throw off your location. Tap <b>+ Add</b> and type your town or ZIP.</p>', next);
+      '<p>Wrong city? A VPN can throw off your location. Tap <b>+ Add</b> and type your town or ZIP.</p>', next, focus === true);
   }
-  function layersTip() {
+  function layersTip(focus) {
     const toggles = $('.card-map .layer-toggles');
     $$('.layer-tip:not(.help-tip)', toggles).forEach((t) => t.remove());
     const tip = makeTip('layers', toggles, '',
-      '<b>Map layers</b>Use these switches to turn layers on and off. Everything starts on except Satellite.');
-    if (tip) toggles.addEventListener('change', () => { if (tip.isConnected) { tip.remove(); S.tips.layers = 1; save(); } }, { once: true });
+      '<b>Map layers</b>Use these switches to turn layers on and off. Everything starts on except Satellite.', next, focus === true);
+    if (tip) toggles.addEventListener('change', () => { if (tip.isConnected) { tip.remove(); S.tips.layers = 1; save(); tip.dispatchEvent(new Event('iw:gone')); next(); } }, { once: true });
+    return tip;
   }
   function installTip() {
     $$('.install-tip').forEach((t) => t.remove());
@@ -92,15 +109,27 @@
 
   // Help: bring every tip back until each one is closed again.
   function showAll() {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
     queue.length = 0; showing = null;
     $$('.help-tip').forEach((t) => t.remove());
-    layersTip();
+    $$('.tip-target').forEach((el) => el.classList.remove('tip-target'));
     if (IS_PHONE || !STANDALONE) installTip();
-    if (S.locs.length) queue.push(watchTip);
-    queue.push(alarmTip);
-    next();
-    document.dispatchEvent(new Event('iw:help'));
+    if (PHONE.matches) {
+      // One card at a time, in the order the buttons appear on the page; each one scrolls its button into view.
+      queue.push(() => alarmTip(true));
+      if (S.locs.length) queue.push(() => watchTip(true));
+      if (window.iwXTip) queue.push(() => window.iwXTip(next, true));
+      queue.push(() => layersTip(true));
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      setTimeout(next, 350);
+    } else {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      layersTip();
+      if (S.locs.length) queue.push(watchTip);
+      queue.push(alarmTip);
+      next();
+      if (window.iwXTip) window.iwXTip();
+    }
+    syncOpen();
   }
   document.addEventListener('click', (e) => { if (e.target.closest('#helpBtn, [data-help]')) { e.preventDefault(); showAll(); } });
 

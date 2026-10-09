@@ -137,24 +137,34 @@
   $('#xTag').addEventListener('change', (e) => { S.x.tag = e.target.checked; save(); refresh(true); });
   $('#xReset').addEventListener('click', () => { S.x = { acc: DEF.slice(), storm: true, tag: false }; save(); renderPicker(); shown = PAGE; refresh(true); });
 
-  // ---------- one-time helper tip ----------
-  let tip = null;
-  function dropTip() { if (tip) { tip.remove(); tip = null; } if (!S.tips.xfeed) { S.tips.xfeed = 1; save(); } }
-  function showTip() {
-    if (tip && tip.isConnected) return;
-    tip = document.createElement('div');
-    tip.className = 'layer-tip help-tip tip-below tip-right'; tip.dataset.tip = 'xfeed'; tip.setAttribute('role', 'note');
-    tip.innerHTML = '<button class="layer-tip-x" type="button" aria-label="Dismiss tip">×</button><b>Pick your accounts</b>' +
+  // ---------- one-time helper tip (same look as the other tips; on phones a card pinned to the bottom) ----------
+  let tip = null, tipDone = null;
+  const finishTip = () => { tip = null; const cb = tipDone; tipDone = null; if (cb) cb(); };
+  function dropTip() {
+    if (tip && tip.isConnected) { tip.remove(); tip.dispatchEvent(new Event('iw:gone')); }
+    if (!S.tips.xfeed) { S.tips.xfeed = 1; save(); }
+    if (tip) finishTip();
+  }
+  function showTip(onClose, focus) {
+    if (tip && tip.isConnected) return tip;
+    tipDone = onClose || null;
+    tip = window.iwTips.make('xfeed', $('#xPickWrap'), 'tip-below tip-right', '<b>Pick your accounts</b>' +
       '<p>This starts with the National Hurricane Center, the National Weather Service, Jim Cantore and The Weather Channel.</p>' +
-      '<p>Tap <b>Choose accounts</b> to add your local NWS office, emergency managers and TV stations from a checklist, or top <b>#Isaias</b> posts.</p>';
-    tip.querySelector('.layer-tip-x').addEventListener('click', dropTip);
-    $('#xPickWrap').appendChild(tip);
+      '<p>Tap <b>Choose accounts</b> to add your local NWS office, emergency managers and TV stations from a checklist, or top <b>#Isaias</b> posts.</p>',
+      finishTip, focus === true);
+    return tip;
+  }
+  window.iwXTip = showTip;
+  function autoTip() {
+    if (S.tips.xfeed) return;
+    // Wait for the first-visit tips (places, alarm) and for any other tip card on screen.
+    if (window.iwTips.busy() || !S.locs.length || !S.tips.alarm || !$('#locSheet').hidden) { setTimeout(autoTip, 1500); return; }
+    showTip();
   }
   if (!S.tips.xfeed && 'IntersectionObserver' in window) {
-    const io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) { io.disconnect(); if (!S.tips.xfeed) setTimeout(showTip, 600); } }, { threshold: 0.5 });
+    const io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) { io.disconnect(); setTimeout(autoTip, 600); } }, { threshold: 0.5 });
     io.observe($('#cardX'));
   }
-  document.addEventListener('iw:help', showTip);
 
   // Posts refresh every 2 minutes (the server caches each account for about that long anyway).
   setTimeout(() => every(120000, () => refresh(false)), 1500);
