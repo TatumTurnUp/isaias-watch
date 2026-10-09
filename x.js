@@ -57,6 +57,8 @@
   const TV_STATES = [['LA', 'Louisiana'], ['MS', 'Mississippi'], ['AL', 'Alabama'], ['FL', 'Florida'], ['GA', 'Georgia']];
   const DEF = ACC.filter((a) => a[5]).map((a) => a[0]);
   const META = new Map(ACC.map((a) => [a[0].toLowerCase(), a]));
+  // National accounts cover every storm in the country, so for them a post has to mention Isaias or the area it is hitting.
+  const ISAIAS_AREA = /isaias|gulf coast|panhandle|florida|alabama|mississippi|louisiana|georgia|pensacola|mobile bay|tallahassee|new orleans|big bend/i;
   const STORM = /isaias|hurricane|tropical|\bstorms?\b|surge|tornado|flood|\brain(fall|s)?\b|\bwinds?\b|\bgusts?\b|evacuat|shelter|landfall|advisory|outage|sandbag|emergency|\bEOC\b|curfew|prepar|\bNHC\b|#\w*wx\b/i;
   const PAGE = window.matchMedia('(max-width: 760px)').matches ? 3 : 8; // phones: keep the tornado card and radar close
 
@@ -108,14 +110,16 @@
   }
   function render() {
     const byId = new Map();
-    const add = (p, fromTag) => {
-      if (!fromTag && S.x.storm && !STORM.test(`${p.text} ${p.quote ? p.quote.text : ''}`)) return;
+    const add = (p, fromTag, via) => {
+      const txt = `${p.text} ${p.quote ? p.quote.text : ''}`;
+      const national = via && (META.get(via.toLowerCase()) || [])[2] === 'nat';
+      if (!fromTag && S.x.storm && !(national ? ISAIAS_AREA : STORM).test(txt)) return;
       const cur = byId.get(p.id) || { ...p, rp: null, rps: [], top: false };
       if (p.rp) { const n = (META.get(p.rp.user.toLowerCase()) || [])[1] || p.rp.name; if (!cur.rps.includes(n) && p.rp.user.toLowerCase() !== p.user.toLowerCase()) cur.rps.push(n); }
       if (fromTag) cur.top = true;
       byId.set(p.id, cur);
     };
-    for (const h of S.x.acc) for (const p of cache.get(`u:${h}`) || []) add(p, false);
+    for (const h of S.x.acc) for (const p of cache.get(`u:${h}`) || []) add(p, false, h);
     // A post from one of your accounts that also reposted it shouldn't say "reposted".
     for (const p of byId.values()) p.rps = p.rps.filter((n) => n !== (META.get(p.user.toLowerCase()) || [])[1]);
     if (S.x.tag) for (const p of cache.get('tag') || []) add(p, true);

@@ -97,8 +97,9 @@
 
   // First visit: once a place is picked, explain the place bar, then the alarm.
   function firstRun() {
-    if (!S.tips.watch && S.locs.length) queue.push(watchTip);
-    if (!S.tips.alarm) queue.push(alarmTip);
+    // Re-check when each tip's turn comes: it may have been seen (Help, another tab) while this one waited.
+    if (!S.tips.watch && S.locs.length) queue.push(() => (S.tips.watch ? null : watchTip()));
+    if (!S.tips.alarm) queue.push(() => (S.tips.alarm ? null : alarmTip()));
     // Let the "alarm set for..." message finish first so the two don't pile up on a phone screen.
     let waited = 0;
     (function go() {

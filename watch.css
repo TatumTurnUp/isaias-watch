@@ -297,3 +297,37 @@ body.sheet-open { overflow: hidden; }
   .frame-time .sh { display: inline-block; min-width: 8ch; text-align: right; }
   .layer-toggles { flex-basis: 100%; }
 }
+
+/* ===== Touch ergonomics (phones and tablets). Taps land reliably at ~40px; desktop keeps its compact sizes. ===== */
+@media (pointer: coarse) {
+  a, button, label, summary, input, select { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+  /* Header */
+  .siren-ctl .btn, .loc-gear, .loc-chip, .loc-add { min-height: 40px; }
+  .loc-chip, .loc-add { display: inline-flex; align-items: center; }
+  .loc-more { min-height: 40px; }
+  button.help-link { padding: 12px 6px; margin: -12px -6px; }
+  /* Chips: map view, wind/gust, feed filters */
+  .chip { min-height: 36px; padding: 0 13px; display: inline-flex; align-items: center; }
+  /* Map */
+  .leaflet-touch .leaflet-bar a { width: 40px; height: 40px; line-height: 40px; font-size: 20px; }
+  .layer-toggles label { min-height: 36px; }
+  .layer-toggles input { width: 18px; height: 18px; }
+  .map-bar input[type=range] { height: 36px; }
+  .map-bar .btn-icon { width: 40px; height: 36px; }
+  .leaflet-marker-icon.city::before { content: ""; position: absolute; inset: -10px; } /* bigger invisible hit area around each city dot */
+  .al-head { min-height: 36px; }
+  .layer-tip-x { width: 40px; height: 40px; top: 0; right: 0; }
+  /* Cards */
+  details > summary { padding: 9px 0; }
+  .fl-more, #gfxLink { padding: 9px 0; }
+  .astat-pill { min-height: 40px; }
+  .x-pick, .x-more { min-height: 40px; }
+  /* A little press feedback, since the browser's own tap flash is off */
+  .btn:active, .chip:active, .loc-chip:active, .loc-add:active, .x-pick:active, .astat-pill:active { transform: scale(.97); }
+}
+/* Small labels on phones: 11px is the smallest that stays readable at arm's length */
+@media (max-width: 760px) {
+  .stat dt, .hr-k, .hr-t, .fl-k, .al-head, .tally span { font-size: 11px; }
+}
+/* Safety net: no stray wide element can ever make a phone page scroll sideways. */
+@media (max-width: 760px) { body { overflow-x: clip; } }
