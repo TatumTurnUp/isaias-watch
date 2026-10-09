@@ -23,3 +23,7 @@ No build step and no framework: plain HTML, CSS and JavaScript, plus three Node 
 ## Analytics
 
 Vercel Web Analytics is on for the project; both pages load `/_vercel/insights/script.js`. Filter by domain in the Analytics tab to tell the two sites apart.
+
+## Deploying
+
+The repo is connected to the Vercel project `isaias-watch`: every push to `main` deploys to production (both isaias-watch.vercel.app and isaias-tatumturnup.vercel.app). Bump `build.json` with each release so open pages show the "new version" pill.
