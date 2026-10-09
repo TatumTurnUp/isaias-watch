@@ -78,7 +78,8 @@ async function gfx(bin) {
 }
 
 // Same grid as the original dashboard: 0.75° over the northern Gulf, next 24 hours.
-const GRID = { latN: 34.5, latS: 21.75, lonW: -95.25, lonE: -82.5, step: 0.75 };
+// Oct 9: moved east with the storm (Lake Charles to the Atlantic coast of Georgia, the Keys to north Georgia).
+const GRID = { latN: 35.25, latS: 24, lonW: -93.75, lonE: -78.75, step: 0.75 };
 async function windOwn() {
   const nx = Math.round((GRID.lonE - GRID.lonW) / GRID.step) + 1;
   const ny = Math.round((GRID.latN - GRID.latS) / GRID.step) + 1;

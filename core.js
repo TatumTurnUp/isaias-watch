@@ -259,12 +259,15 @@ async function loadStorm() {
     if (!s) { $('#stormClass').textContent = 'Not currently active in NHC data'; mark('nhc', true, 'NHC'); return; }
     const kt = +s.intensity;
     const mph = nhcMph(kt);
-    const cls = saffir(mph);
+    // NHC's own classification wins over the wind speed (after landfall it can be post-tropical with tropical-storm winds).
+    const NHC_CLS = { TS: 'Tropical storm', TD: 'Tropical depression', STS: 'Subtropical storm', SS: 'Subtropical storm', SD: 'Subtropical depression', PTC: 'Post-tropical cyclone', PC: 'Potential tropical cyclone', RL: 'Remnant low', LO: 'Remnant low' };
+    const code = String(s.classification || '').toUpperCase();
+    const cls = code === 'HU' || code === 'MH' || !NHC_CLS[code] ? saffir(mph) : NHC_CLS[code];
     storm = { lat: s.latitudeNumeric, lon: s.longitudeNumeric, bin: s.binNumber, mph, kt, cls, adv: s.publicAdvisory, raw: s };
     $('#stormName').textContent = s.name;
     setStat('name', s.name);
     setStat('stormClass', cls);
-    [$('#stormClass'), ...$$('[data-s="stormClass"]')].forEach((el) => el.classList.toggle('is-hu', mph >= 74));
+    [$('#stormClass'), ...$$('[data-s="stormClass"]')].forEach((el) => el.classList.toggle('is-hu', /hurricane/i.test(cls)));
     setStat('sWind', `${mph} mph`);
     setStat('sPres', `${s.pressure} mb`);
     setStat('sMove', `${compass(s.movementDir)} ${ktToMph(+s.movementSpeed)} mph`);

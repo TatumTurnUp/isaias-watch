@@ -2,42 +2,59 @@
 'use strict';
 (function xFeed() {
   // [handle, name, group, area it mainly covers (local only), states, on by default]
+  // Re-vetted Oct 9 (storm moving east): every account here had at least two recent posts about Isaias, the latest
+  // within the past 18 hours. Accounts that had gone quiet on the storm were dropped.
   const ACC = [
     ['NHC_Atlantic', 'National Hurricane Center', 'nat', '', [], true],
     ['NWS', 'National Weather Service', 'nat', '', [], true],
     ['JimCantore', 'Jim Cantore', 'nat', '', [], true],
     ['weatherchannel', 'The Weather Channel', 'nat', '', [], true],
     ['NHC_Surge', 'NHC Storm Surge', 'nat', '', [], false],
-    ['NWSSPC', 'NWS Storm Prediction Center', 'nat', '', [], false],
+    ['MichaelRLowry', 'Michael Lowry, hurricane specialist', 'nat', '', [], false],
     ['NWSWPC', 'NWS Weather Prediction Center', 'nat', '', [], false],
     ['53rdWRS', 'Hurricane Hunters', 'nat', '', [], false],
-    ['NOAA', 'NOAA', 'nat', '', [], false],
+    ['hurricanetrack', 'Mark Sudduth, HurricaneTrack', 'nat', '', [], false],
     ['fema', 'FEMA', 'nat', '', [], false],
     ['NWSNewOrleans', 'NWS New Orleans', 'nws', 'New Orleans, Baton Rouge & the MS Coast', ['LA', 'MS'], false],
     ['NWSMobile', 'NWS Mobile', 'nws', 'Mobile & Pensacola', ['AL', 'FL'], false],
     ['NWSTallahassee', 'NWS Tallahassee', 'nws', 'Tallahassee, Big Bend & SW Georgia', ['FL', 'GA'], false],
     ['NWSJacksonMS', 'NWS Jackson', 'nws', 'Central & South MS, incl. Hattiesburg', ['MS'], false],
     ['NWSLakeCharles', 'NWS Lake Charles', 'nws', 'SW Louisiana', ['LA'], false],
-    ['NWSBirmingham', 'NWS Birmingham', 'nws', 'Central Alabama', ['AL'], false],
     ['NWSAtlanta', 'NWS Atlanta', 'nws', 'North & Central Georgia', ['GA'], false],
+    ['NWSColumbia', 'NWS Columbia', 'nws', 'Central SC & Augusta, GA', ['SC', 'GA'], false],
+    ['NWSTampaBay', 'NWS Tampa Bay', 'nws', 'Tampa Bay & SW Florida', ['FL'], false],
+    ['NWSKeyWest', 'NWS Key West', 'nws', 'Florida Keys', ['FL'], false],
     ['MSEMA', 'Mississippi Emergency Management', 'ema', 'Mississippi', ['MS'], false],
     ['AlabamaEMA', 'Alabama EMA', 'ema', 'Alabama', ['AL'], false],
     ['FLSERT', 'Florida Division of Emergency Management', 'ema', 'Florida', ['FL'], false],
-    ['WDAM', 'WDAM 7', 'tv', 'Hattiesburg & the Pine Belt', ['MS'], false],
-    ['WLOX', 'WLOX', 'tv', 'Biloxi & Gulfport', ['MS'], false],
-    ['WXXV25', 'WXXV 25', 'tv', 'Gulfport & the MS Coast', ['MS'], false],
-    ['WJTV', 'WJTV 12', 'tv', 'Jackson, MS', ['MS'], false],
     ['WWLTV', 'WWL-TV', 'tv', 'New Orleans', ['LA'], false],
     ['WDSU', 'WDSU', 'tv', 'New Orleans', ['LA'], false],
     ['WAFB', 'WAFB 9', 'tv', 'Baton Rouge', ['LA'], false],
+    ['WLOX', 'WLOX', 'tv', 'Biloxi & Gulfport', ['MS'], false],
+    ['WXXV25', 'WXXV 25', 'tv', 'Gulfport & the MS Coast', ['MS'], false],
+    ['WJTV', 'WJTV 12', 'tv', 'Jackson, MS', ['MS'], false],
     ['WKRG', 'WKRG', 'tv', 'Mobile & Pensacola', ['AL', 'FL'], false],
-    ['FOX10News', 'FOX10 News', 'tv', 'Mobile & Pensacola', ['AL', 'FL'], false],
+    ['wtvynews4', 'WTVY News 4', 'tv', 'Dothan & the Wiregrass', ['AL', 'GA'], false],
     ['weartv', 'WEAR ABC 3', 'tv', 'Pensacola & NW Florida', ['FL'], false],
     ['WJHG_TV', 'WJHG 7', 'tv', 'Panama City', ['FL'], false],
     ['WCTV', 'WCTV', 'tv', 'Tallahassee & South Georgia', ['FL', 'GA'], false],
-    ['wtvynews4', 'WTVY News 4', 'tv', 'Dothan & the Wiregrass', ['AL'], false],
+    ['ActionNewsJax', 'Action News Jax', 'tv', 'Jacksonville & SE Georgia', ['FL', 'GA'], false],
+    ['FCN2go', 'First Coast News', 'tv', 'Jacksonville & SE Georgia', ['FL', 'GA'], false],
+    ['wjxt4', 'News4JAX', 'tv', 'Jacksonville', ['FL', 'GA'], false],
+    ['WCJB20', 'WCJB TV20', 'tv', 'Gainesville & North Central Florida', ['FL'], false],
+    ['WFLA', 'WFLA News Channel 8', 'tv', 'Tampa Bay', ['FL'], false],
+    ['BN9', 'Spectrum Bay News 9', 'tv', 'Tampa Bay', ['FL'], false],
+    ['FOX13News', 'FOX 13', 'tv', 'Tampa Bay', ['FL'], false],
+    ['WFTV', 'WFTV Channel 9', 'tv', 'Orlando', ['FL'], false],
+    ['WESH', 'WESH 2', 'tv', 'Orlando', ['FL'], false],
+    ['MyNews13', 'Spectrum News 13', 'tv', 'Orlando & Central Florida', ['FL'], false],
+    ['wsbtv', 'WSB-TV', 'tv', 'Atlanta', ['GA'], false],
+    ['11AliveNews', '11Alive', 'tv', 'Atlanta', ['GA'], false],
+    ['FOX5Atlanta', 'FOX 5 Atlanta', 'tv', 'Atlanta', ['GA'], false],
+    ['41NBC', '41NBC', 'tv', 'Macon & Middle Georgia', ['GA'], false],
   ];
   const GROUPS = [['nat', 'National'], ['nws', 'Local NWS offices'], ['ema', 'State emergency management'], ['tv', 'Local TV news']];
+  const TV_STATES = [['LA', 'Louisiana'], ['MS', 'Mississippi'], ['AL', 'Alabama'], ['FL', 'Florida'], ['GA', 'Georgia']];
   const DEF = ACC.filter((a) => a[5]).map((a) => a[0]);
   const META = new Map(ACC.map((a) => [a[0].toLowerCase(), a]));
   const STORM = /isaias|hurricane|tropical|\bstorms?\b|surge|tornado|flood|\brain(fall|s)?\b|\bwinds?\b|\bgusts?\b|evacuat|shelter|landfall|advisory|outage|sandbag|emergency|\bEOC\b|curfew|prepar|\bNHC\b|#\w*wx\b/i;
@@ -60,11 +77,15 @@
     } catch (e) { failed.add(key); }
   }
   const keysNow = () => [...S.x.acc.map((h) => [`u:${h}`, `/api/x?u=${encodeURIComponent(h)}`]), ...(S.x.tag ? [['tag', '/api/x?tag=isaias']] : [])];
+  let retryTimer = null;
   async function refresh(onlyMissing = false) {
     const ks = keysNow().filter(([k]) => !onlyMissing || !cache.has(k));
     if (ks.length) await Promise.all(ks.map(([k, u]) => pull(k, u)));
     loadedOnce = true;
     render();
+    // X's free relay fails now and then; accounts that haven't loaded yet get another try soon.
+    clearTimeout(retryTimer);
+    if (keysNow().some(([k]) => !cache.has(k))) retryTimer = setTimeout(() => refresh(true), 30000);
   }
 
   const areaOf = (h) => { const m = META.get(String(h).toLowerCase()); return m && m[3] ? m[3] : ''; };
@@ -100,7 +121,7 @@
     if (S.x.tag) for (const p of cache.get('tag') || []) add(p, true);
     const list = [...byId.values()].sort((a, b) => b.t - a.t);
     const names = S.x.acc.map((h) => (META.get(h.toLowerCase()) || [])[1]).filter(Boolean);
-    $('#xSel').textContent = `${names.length ? (names.length > 3 ? `${names.slice(0, 3).join(', ')} + ${names.length - 3} more` : andList(names)) : 'No accounts'}${S.x.tag ? ' · top #Isaias' : ''}${S.x.storm ? ' · storm posts only' : ''}`;
+    $('#xSel').textContent = `${names.length ? (names.length > 3 ? `${names.slice(0, 3).join(', ')} + ${names.length - 3} more` : andList(names)) : 'No accounts'}${S.x.tag ? (failed.has('tag') && !cache.has('tag') ? ' · top #Isaias unavailable right now' : ' · top #Isaias') : ''}${S.x.storm ? ' · storm posts only' : ''}`;
     if (!list.length) {
       const allFailed = keysNow().length && keysNow().every(([k]) => failed.has(k));
       feed.innerHTML = `<li class="empty">${!loadedOnce ? 'Loading posts…' : !keysNow().length ? 'No accounts picked. Tap <b>Choose accounts</b> to add some.' : allFailed ? 'Couldn’t reach X right now. Trying again in 2 minutes.' : 'No storm posts from these accounts in the last few days. Add more accounts, or turn off “Only posts about the storm.”'}</li>`;
@@ -117,24 +138,35 @@
     $('#xStorm').checked = !!S.x.storm; $('#xTag').checked = !!S.x.tag;
     const st = new Set(S.locs.map((l) => l.st));
     const on = new Set(S.x.acc.map((h) => h.toLowerCase()));
-    $('#xGroups').innerHTML = GROUPS.map(([g, title]) => {
-      let rows = ACC.filter((a) => a[2] === g);
-      if (g !== 'nat') rows = rows.slice().sort((a, b) => (b[4].some((s) => st.has(s)) - a[4].some((s) => st.has(s))));
-      return `<section class="set"><h3>${title}</h3><div class="extra">${rows.map(([h, n, , area, sts]) => {
-        const near = g !== 'nat' && sts.some((s) => st.has(s));
-        return `<label class="ex"><input type="checkbox" data-xa="${esc(h)}"${on.has(h.toLowerCase()) ? ' checked' : ''}><span><b>${esc(n)}</b> <span class="x-h">@${esc(h)}</span>${area ? ` <span class="x-area">(${esc(area)})</span>` : ''}${near ? ' <em class="x-near">near your places</em>' : ''}</span></label>`;
-      }).join('')}</div></section>`;
-    }).join('');
+    const row = ([h, n, , area, sts], g) => {
+      const near = g !== 'nat' && sts.some((x) => st.has(x));
+      return `<label class="ex"><input type="checkbox" data-xa="${esc(h)}"${on.has(h.toLowerCase()) ? ' checked' : ''}><span><b>${esc(n)}</b> <span class="x-h">@${esc(h)}</span>${area ? ` <span class="x-area">(${esc(area)})</span>` : ''}${near ? ' <em class="x-near">near your places</em>' : ''}</span></label>`;
+    };
+    const nearFirst = (rows) => rows.slice().sort((a, b) => (b[4].some((x) => st.has(x)) - a[4].some((x) => st.has(x))));
+    const sections = [];
+    for (const [g, title] of GROUPS) {
+      if (g !== 'tv') {
+        let rows = ACC.filter((a) => a[2] === g);
+        if (g !== 'nat') rows = nearFirst(rows);
+        sections.push([title, rows, g]);
+        continue;
+      }
+      // Local TV, one list per state, the states of your places first.
+      const tv = TV_STATES.map(([code, name]) => [`Local TV · ${name}`, ACC.filter((a) => a[2] === 'tv' && a[4][0] === code), code]);
+      tv.sort((a, b) => st.has(b[2]) - st.has(a[2]));
+      sections.push(...tv.map(([t, rows]) => [t, rows, 'tv']));
+    }
+    $('#xGroups').innerHTML = sections.filter(([, rows]) => rows.length).map(([title, rows, g]) => `<section class="set"><h3>${esc(title)}</h3><div class="extra">${rows.map((r) => row(r, g)).join('')}</div></section>`).join('');
   }
   $('#xPickBtn').addEventListener('click', () => { renderPicker(); openSheet('xSheet'); dropTip(); });
   $('#xGroups').addEventListener('change', (e) => {
     const i = e.target.closest('[data-xa]'); if (!i) return;
     const h = i.dataset.xa;
     S.x.acc = i.checked ? [...S.x.acc.filter((x) => x !== h), h] : S.x.acc.filter((x) => x !== h);
-    save(); shown = PAGE; refresh(true);
+    save(); shown = PAGE; render(); refresh(true);
   });
   $('#xStorm').addEventListener('change', (e) => { S.x.storm = e.target.checked; save(); render(); });
-  $('#xTag').addEventListener('change', (e) => { S.x.tag = e.target.checked; save(); refresh(true); });
+  $('#xTag').addEventListener('change', (e) => { S.x.tag = e.target.checked; save(); render(); refresh(true); });
   $('#xReset').addEventListener('click', () => { S.x = { acc: DEF.slice(), storm: true, tag: false }; save(); renderPicker(); shown = PAGE; refresh(true); });
 
   // ---------- one-time helper tip (same look as the other tips; on phones a card pinned to the bottom) ----------

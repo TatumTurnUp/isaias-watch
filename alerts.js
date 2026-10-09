@@ -32,13 +32,15 @@ function areaStates() {
 // watch or warning), not only the states around your places. Those extra states get their own small query so the
 // map doesn't have to draw every zone in them.
 const US_ST = new Set(Object.values(ABBR));
+// Eastern Pacific storms put tropical alerts on the West Coast and Hawaii; those have nothing to do with Isaias.
+const PACIFIC = new Set(['CA', 'OR', 'WA', 'HI', 'AK', 'NV', 'AZ']);
 const TROPICAL = ['Hurricane Warning', 'Hurricane Watch', 'Tropical Storm Warning', 'Tropical Storm Watch', 'Storm Surge Warning', 'Storm Surge Watch'];
 let stormStates = [...DEFAULT_AREA];
 let torExtra = [];
 async function loadStormStates() {
   const d = await getJSON(`https://api.weather.gov/alerts/active?event=${TROPICAL.map(encodeURIComponent).join(',')}`, { headers: NWS_HEADERS });
   const set = new Set();
-  for (const f of d.features || []) for (const u of f.properties.geocode?.UGC || []) { const st = u.slice(0, 2); if (US_ST.has(st)) set.add(st); }
+  for (const f of d.features || []) for (const u of f.properties.geocode?.UGC || []) { const st = u.slice(0, 2); if (US_ST.has(st) && !PACIFIC.has(st)) set.add(st); }
   if (set.size) stormStates = [...set].sort();
 }
 const orList = (a) => (a.length < 2 ? a.join('') : `${a.slice(0, -1).join(', ')} or ${a[a.length - 1]}`);

@@ -27,7 +27,7 @@ with sync_playwright() as p:
         print(name, 'groups:', pg.eval_on_selector_all('#xGroups h3', 'els => els.map(e => e.textContent)'), 'near:', pg.eval_on_selector_all('#xGroups .x-near', 'els => els.length'))
         pg.screenshot(path=f'{OUT}/{name}_sheet.png')
         if name == 'desk':
-            pg.check('[data-xa="NWSMobile"]'); pg.check('[data-xa="WDAM"]'); time.sleep(4)
+            pg.check('[data-xa="NWSMobile"]'); pg.check('[data-xa="wsbtv"]'); time.sleep(4)
             pg.check('#xTag'); time.sleep(5)
             pg.evaluate("document.querySelector('#xSheet .sheet-x').click()"); time.sleep(0.5)
             print(name, 'sel2:', pg.text_content('#xSel'))
@@ -40,6 +40,7 @@ with sync_playwright() as p:
             pg.click('#helpBtn'); time.sleep(1.5)
             print(name, 'help shows x tip:', pg.eval_on_selector_all('.help-tip[data-tip="xfeed"]', 'els => els.length'))
         ctx.close()
+    if BASE.startswith("https"): b.close(); print("\n".join(errs[:30]) or "no errors"); sys.exit(0)
     # old dashboard
     ctx = b.new_context(viewport={'width': 1440, 'height': 900}); ctx.add_cookies([{'name': 'iw_old', 'value': '1', 'url': BASE}])
     pg = ctx.new_page(); W(pg, 'old'); pg.goto(BASE + '/', wait_until='domcontentloaded'); time.sleep(5)
