@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Isaias Watch</title>
+<meta name="theme-color" content="#0a0f14">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=2">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Isaias Watch">
+<meta name="format-detection" content="telephone=no">
+<script>window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); window.__bip = e; document.dispatchEvent(new Event('bip')); });</script>
+<meta name="description" content="Live Hurricane Isaias monitor for Hattiesburg and New Orleans: radar, wind, NWS alerts, tornado warnings, NHC updates.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet-gesture-handling@1.2.2/dist/leaflet-gesture-handling.min.css">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="mobile.css">
+<style>
+.radar-note { margin: 10px 0 0; padding: 8px 10px; border-left: 3px solid var(--accent); background: rgba(76, 195, 217, .07); border-radius: 0 6px 6px 0; font-size: 12.5px; line-height: 1.45; color: var(--fg); max-width: 75ch; }
+.radar-note b { color: var(--accent); font-weight: 600; }
+@media (max-width: 760px) { .radar-note { font-size: 12px; } }
+/* Share button + snapshot sheet */
+.btn-share { display: inline-flex; align-items: center; gap: 6px; }
+.btn-share svg { flex: none; margin-top: -2px; }
+.snap { position: fixed; inset: 0; z-index: 2000; display: grid; place-items: center; padding: 16px; background: rgba(3, 6, 9, .78); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
+.snap[hidden] { display: none !important; }
+.snap-box { position: relative; width: min(440px, 100%); max-height: 100%; overflow: auto; padding: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 18px 50px rgba(0,0,0,.6); }
+.snap-img { display: block; width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--line); -webkit-touch-callout: default; }
+.snap-x { position: absolute; top: 4px; right: 6px; width: 34px; height: 34px; border: 0; background: none; color: var(--muted); font-size: 24px; line-height: 1; cursor: pointer; }
+.snap-x:hover { color: var(--fg); }
+.snap-box .snap-img { margin-top: 26px; }
+.snap-hint { margin: 10px 2px 0; font-size: 12.5px; color: var(--muted); }
+.snap-hint:empty { display: none; }
+.snap-actions { display: flex; gap: 8px; margin-top: 12px; }
+.snap-actions .btn { flex: 1; padding: 11px 12px; font-size: 14px; text-align: center; text-decoration: none; }
+.snap-actions .btn-solid { background: var(--accent); border-color: var(--accent); color: #062026; }
+/* Installed on a phone's home screen: iPhones fade whatever sits right under the status bar, so the top of
+   the page, the sticky mini bar (via --mini-pad in app.js) and the tornado banner get 22px of extra room. */
+@media (display-mode: standalone) and (pointer: coarse) {
+  :root { --pwa-top: 22px; }
+  body { padding-top: calc(env(safe-area-inset-top, 0px) + var(--pwa-top)); }
+  .home-banner { padding-top: var(--pwa-top); }
+}
+/* One-time "add to Home Screen" tip, same look as the map-layers tip */
+.install-tip {
+  position: relative; margin: 10px 0 2px; padding: 10px 34px 11px 12px; border-radius: 9px;
+  background: #e8f7fa; color: #0a1a20; font-size: 12.5px; line-height: 1.45; box-shadow: 0 8px 24px rgba(0,0,0,.45);
+}
+.install-tip b { display: block; font-size: 13px; margin-bottom: 2px; }
+.install-tip .it-k { font-weight: 600; white-space: nowrap; }
+.install-tip .it-ico { vertical-align: -2px; margin: 0 1px; }
+.install-tip .it-install { display: block; margin-top: 8px; padding: 8px 14px; border: 0; border-radius: 7px; background: #0a1a20; color: #e8f7fa; font: 600 13px/1 var(--font-body); cursor: pointer; }
+@media (prefers-reduced-motion: no-preference) { .install-tip { animation: tip-in .3s ease-out; } }
+/* New-version pill (pwa.js) */
+.update-pill {
+  position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 1500;
+  padding: 10px 16px; border: 0; border-radius: 999px; background: var(--accent); color: #062026;
+  font: 600 13px/1 var(--font-body); white-space: nowrap; box-shadow: 0 6px 20px rgba(0,0,0,.5); cursor: pointer;
+}
+@media (max-width: 760px) { .update-pill { bottom: calc(76px + env(safe-area-inset-bottom, 0px)); } } /* clear the back-to-top button */
+/* Desktop right column: Tornadoes, Conditions now, NHC forecast, Latest updates. Latest updates stretches
+   down to line up with the bottom of the Hattiesburg / New Orleans cards and scrolls inside itself. */
+@media (min-width: 1101px) {
+  .col-side .card-feed { flex: 1 1 0; min-height: 420px; }
+  .col-side .card-feed .feed { flex: 1 1 0; min-height: 0; max-height: none; }
+}
+/* Watches & warnings legend on the radar map */
+.al-legend { position: absolute; right: 10px; top: 10px; z-index: 500; max-width: 240px; background: rgba(10,15,20,.9); border: 1px solid var(--line); border-radius: 8px; font-size: 11px; }
+.al-head { display: flex; align-items: center; gap: 7px; width: 100%; padding: 8px 10px; background: none; border: 0; color: var(--muted); font: 600 10px/1 var(--font-body); text-transform: uppercase; letter-spacing: .08em; cursor: pointer; text-align: left; }
+.al-n { font: 600 10px/1 var(--font-mono); color: var(--fg); background: var(--panel-2); border-radius: 4px; padding: 2px 5px; }
+.al-chev { margin-left: auto; width: 6px; height: 6px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: translateY(-2px) rotate(45deg); flex: none; }
+.al-legend.is-closed .al-chev { transform: rotate(-135deg); }
+.al-rows { display: grid; gap: 4px; padding: 0 10px 9px; max-height: 42vh; overflow-y: auto; }
+.al-legend.is-closed .al-rows { display: none; }
+.al-sw { width: 16px; height: 10px; border-radius: 2px; display: inline-block; flex: none; vertical-align: -1px; box-sizing: border-box; }
+.al-fill { background: var(--c); opacity: .8; }
+.al-hatch { background: repeating-linear-gradient(45deg, var(--c) 0 3px, transparent 3px 6px); border: 1px solid var(--c); }
+.al-outline { border: 2px solid var(--c); }
+.leaflet-tooltip.zone-tip, .zone-pop .leaflet-popup-content { line-height: 1.6; }
+@media (max-width: 760px) { .al-legend { top: 8px; right: 8px; max-width: 210px; } .al-head { padding: 7px 9px; } }
+/* Conditions now: flooding line under each city */
+.ob-flood { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 6px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); font-size: 12px; }
+.fl-k { font: 600 10px/1 var(--font-body); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-right: 2px; }
+.fl-n { font: 600 11px/1 var(--font-mono); padding: 4px 6px; border-radius: 5px; background: var(--bg); border: 1px solid var(--line); }
+.fl-warn { color: #ff8a8a; border-color: #5a2020; }
+.fl-watch { color: #ffd27a; border-color: #5a4515; }
+.fl-none { color: var(--muted); }
+.fl-more { margin-left: auto; font-weight: 600; color: var(--accent); text-decoration: none; white-space: nowrap; }
+.fl-more:hover { text-decoration: underline; }
+/* "See more" lands on the city's alerts (clear of the sticky bars) and flashes its flood cards */
+.region { scroll-margin-top: 96px; }
+@media (max-width: 760px) { .region { scroll-margin-top: calc(58px + env(safe-area-inset-top, 0px) + var(--pwa-top, 0px)); } }
+@keyframes flood-flash { 50% { box-shadow: 0 0 0 3px var(--c); background: rgba(24, 201, 100, .16); } }
+.agroup.is-flashing { animation: flood-flash .7s ease-in-out 4; }
+.new-site { display: flex; align-items: center; gap: 10px 16px; flex-wrap: wrap; margin: 12px 0 0; padding: 11px 14px; border-radius: 10px; border: 1px solid rgba(76,195,217,.45); background: rgba(76,195,217,.09); color: var(--fg); text-decoration: none; font-size: 13.5px; line-height: 1.4; }
+.new-site b { color: var(--accent); font-weight: 600; }
+.new-site .ns-go { margin-left: auto; padding: 7px 12px; border-radius: 7px; background: var(--accent); color: #062026; font-weight: 600; white-space: nowrap; }
+.new-site:hover .ns-go { background: #6fd3e4; }
+@media (max-width: 760px) { .new-site { font-size: 13px; } .new-site .ns-go { margin-left: 0; } }
+</style>
+</head>
+<body>
+
+<div id="homeBanner" class="home-banner" hidden role="alert" aria-live="assertive">
+  <div class="hb-inner">
+    <div class="hb-text">
+      <div class="hb-kicker" id="hbKicker">Tornado warning · Hattiesburg area</div>
+      <div class="hb-title" id="hbTitle">Take shelter now</div>
+      <div class="hb-detail" id="hbDetail"></div>
+    </div>
+    <button class="btn btn-solid" id="hbAck" type="button">Silence siren</button>
+  </div>
+</div>
+
+<a class="new-site" href="https://isaias-watch.vercel.app/">
+  <span><b>New Isaias tracker:</b> for a more custom experience, use the new version. Pick your own location, save several places, and choose which counties set off your tornado alarm.</span>
+  <span class="ns-go">Open isaias-watch.vercel.app</span>
+</a>
+
+<header class="topbar" id="topbar">
+  <div class="head-row">
+    <div class="storm-id">
+      <div class="storm-class" id="stormClass">Tropical system</div>
+      <h1 class="storm-name" id="stormName">Isaias</h1>
+    </div>
+    <div class="clock clock-m" aria-hidden="true"><span data-clock>--:--</span><span class="clock-utc" data-clock-utc>--:--</span></div>
+  </div>
+
+  <dl class="storm-stats" id="stormStats">
+    <div class="stat"><dt>Max winds</dt><dd id="sWind">--</dd></div>
+    <div class="stat"><dt>Pressure</dt><dd id="sPres">--</dd></div>
+    <div class="stat"><dt>Moving</dt><dd id="sMove">--</dd></div>
+    <div class="stat"><dt>Center</dt><dd id="sPos">--</dd></div>
+    <div class="stat stat-home"><dt>To Hattiesburg</dt><dd id="sDistH">--</dd></div>
+    <div class="stat"><dt>To New Orleans</dt><dd id="sDistN">--</dd></div>
+  </dl>
+
+  <div class="topbar-right">
+    <div class="clock"><span id="clock">--:--</span><span class="clock-utc" id="clockUtc">--:--</span></div>
+    <div class="adv" id="sAdv">NHC advisory --</div>
+    <div class="siren-ctl">
+      <button class="btn" id="armBtn" type="button">Turn on siren</button>
+      <button class="btn btn-ghost" id="testBtn" type="button" title="Plays the siren and shows a sample banner for 8 seconds">Test</button>
+      <button class="btn btn-ghost btn-share" id="shareBtn" type="button" title="Save a picture of this banner"><svg width="14" height="15" viewBox="0 0 14 15" aria-hidden="true"><path d="M7 9.5V1.5M4 4.3 7 1.3l3 3M4.5 6.5H2.5v7h9v-7h-2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Share</button>
+    </div>
+  </div>
+</header>
+
+<!-- Phone only: slim bar that sticks to the top once the header scrolls away. Tap to expand. -->
+<div class="mini" id="mini" hidden>
+  <button class="mini-row" id="miniRow" type="button" aria-expanded="false" aria-controls="miniFull">
+    <span class="mini-name" data-s="name">Isaias</span>
+    <span class="mini-stat"><span class="mini-k">Max</span> <span data-s="sWind">--</span></span>
+    <span class="mini-stat"><span data-s="sMove">--</span></span>
+    <span class="mini-time" data-clock-mini>--:--</span>
+    <span class="mini-chev" aria-hidden="true"></span>
+  </button>
+  <div class="mini-full" id="miniFull" hidden>
+    <div class="head-row">
+      <div class="storm-id">
+        <div class="storm-class" data-s="stormClass">Tropical system</div>
+        <div class="storm-name" data-s="name">Isaias</div>
+      </div>
+      <div class="clock clock-m"><span data-clock>--:--</span><span class="clock-utc" data-clock-utc>--:--</span></div>
+    </div>
+    <dl class="storm-stats">
+      <div class="stat"><dt>Max winds</dt><dd data-s="sWind">--</dd></div>
+      <div class="stat"><dt>Pressure</dt><dd data-s="sPres">--</dd></div>
+      <div class="stat"><dt>Moving</dt><dd data-s="sMove">--</dd></div>
+      <div class="stat"><dt>Center</dt><dd data-s="sPos">--</dd></div>
+      <div class="stat stat-home"><dt>To Hattiesburg</dt><dd data-s="sDistH">--</dd></div>
+      <div class="stat"><dt>To New Orleans</dt><dd data-s="sDistN">--</dd></div>
+    </dl>
+    <div class="adv" data-s="sAdv">NHC advisory --</div>
+  </div>
+</div>
+<!-- Share: preview sheet for the banner snapshot (iPhone goes straight to the share sheet instead) -->
+<div class="snap" id="snap" hidden role="dialog" aria-modal="true" aria-label="Share storm snapshot">
+  <div class="snap-box">
+    <button class="snap-x" id="snapX" type="button" aria-label="Close">&times;</button>
+    <img class="snap-img" id="snapImg" alt="Snapshot of the storm banner">
+    <p class="snap-hint" id="snapHint"></p>
+    <div class="snap-actions" id="snapActions"></div>
+  </div>
+</div>
+<button class="to-top" id="toTop" type="button" aria-label="Back to top" hidden><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M9 14V4M4 8.5 9 3.5l5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+
+<div id="rearm" class="rearm" hidden>Siren is armed but your browser paused sound after reload. Click anywhere on the page to re-enable it.</div>
+
+<main class="layout">
+  <div class="col col-main">
+
+    <section class="card card-map" id="cardMap" aria-label="Radar">
+      <div class="card-head">
+        <h2>Radar &amp; storm track</h2>
+        <div class="map-views" role="group" aria-label="Map view">
+          <button class="chip" data-view="storm" type="button">Whole storm</button>
+          <button class="chip" data-view="hat" type="button">Hattiesburg</button>
+          <button class="chip" data-view="nola" type="button">New Orleans</button>
+        </div>
+      </div>
+      <div class="map-wrap">
+        <div id="map"></div>
+        <div class="map-legend" id="legend">
+          <div class="lg-row"><span class="sw sw-34"></span>34 kt+ winds (39 mph)</div>
+          <div class="lg-row"><span class="sw sw-50"></span>50 kt+ winds (58 mph)</div>
+          <div class="lg-row"><span class="sw sw-64"></span>64 kt+ winds (hurricane)</div>
+          <div class="lg-row"><span class="sw sw-cone"></span>NHC forecast cone</div>
+          <div class="lg-row"><span class="sw sw-ring"></span>50-mile radius</div>
+        </div>
+      </div>
+      <div class="map-bar">
+        <button class="btn btn-icon" id="playBtn" type="button" aria-label="Pause radar loop">❚❚</button>
+        <input type="range" id="frameSlider" min="0" max="10" value="10" aria-label="Radar frame">
+        <span class="frame-time mono" id="frameTime">--</span>
+        <div class="layer-toggles">
+          <label><input type="checkbox" id="tSat"> Satellite</label>
+          <label><input type="checkbox" id="tRad" checked> Radar</label>
+          <label><input type="checkbox" id="tNhc" checked> NHC track</label>
+          <label><input type="checkbox" id="tWind" checked> Wind field</label>
+          <label><input type="checkbox" id="tWarn" checked> Alerts</label>
+        </div>
+      </div>
+      <!-- Temporary note: hides itself at 11:59 PM CT Thursday, Oct 8 -->
+      <p class="radar-note" id="radarNote"><b>Why the Gulf looks empty:</b> radar comes from ground stations that only see about 150&ndash;250 miles offshore, and Isaias is still farther out than that. Its rain bands should start showing up on radar around <b>Thursday night</b>. To see the storm now, turn on <b>Satellite</b>.</p>
+      <script>(function () { var n = document.getElementById('radarNote'); function check() { if (Date.now() >= Date.parse('2026-10-09T04:59:00Z')) n.hidden = true; } check(); setInterval(check, 60000); })();</script>
+    </section>
+
+    <section class="card card-wind" aria-label="Wind">
+      <div class="card-head">
+        <h2>Wind &amp; gusts</h2>
+        <div class="map-views" role="group" aria-label="Wind layer">
+          <button class="chip is-on" data-ov="wind" type="button">Wind</button>
+          <button class="chip" data-ov="gust" type="button">Gusts</button>
+          <button class="chip" data-ov="rain" type="button">Rain</button>
+        </div>
+      </div>
+      <div class="wind-wrap"><iframe id="windy" title="Windy wind map" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe></div>
+      <p class="fine">Animated surface wind from the ECMWF model via Windy, centered on Isaias with a marker on Hattiesburg. Model output, not observations; the observed 34/50/64-kt wind field from NHC is on the radar map above.</p>
+    </section>
+
+    <div class="regions">
+      <section class="card region" id="regionHat" aria-label="Hattiesburg area alerts">
+        <div class="card-head">
+          <h2>Hattiesburg <span class="sub"><span class="lg">50-mile radius</span><span class="sh">50 mi</span></span></h2>
+          <div class="tally" id="tallyHat"></div>
+        </div>
+        <div class="alert-list" id="listHat"><div class="empty">Loading NWS alerts…</div></div>
+        <details class="covers"><summary>Counties &amp; parishes covered</summary><p id="coverHat"></p></details>
+      </section>
+
+      <section class="card region" id="regionNola" aria-label="New Orleans area alerts">
+        <div class="card-head">
+          <h2>New Orleans <span class="sub"><span class="lg">50-mile radius</span><span class="sh">50 mi</span></span></h2>
+          <div class="tally" id="tallyNola"></div>
+        </div>
+        <div class="alert-list" id="listNola"><div class="empty">Loading NWS alerts…</div></div>
+        <details class="covers"><summary>Counties &amp; parishes covered</summary><p id="coverNola"></p></details>
+      </section>
+    </div>
+  </div>
+
+  <div class="col col-side">
+    <section class="card card-tor" id="cardTor" aria-label="Tornado activity">
+      <div class="card-head">
+        <h2>Tornadoes <span class="sub"><span class="lg">MS &amp; LA warnings · siren for Forrest/Lamar</span><span class="sh">MS &amp; LA</span></span></h2>
+        <div class="tor-count mono" id="torCount">--</div>
+      </div>
+      <div class="tor-watch" id="torWatch">Checking tornado watches near Hattiesburg…</div>
+      <div class="tor-list" id="torList"></div>
+    </section>
+
+    <section class="card card-obs" aria-label="Current conditions">
+      <div class="card-head"><h2>Conditions now</h2></div>
+      <div class="obs" id="obs"></div>
+    </section>
+
+    <section class="card card-track" aria-label="Forecast">
+      <div class="card-head"><h2>NHC forecast</h2><a class="link" id="gfxLink" href="https://www.nhc.noaa.gov/" target="_blank" rel="noopener">NHC graphics ↗</a></div>
+      <p class="closest" id="closest"></p>
+      <div class="table-wrap"><table class="track mono" id="trackTable"><thead><tr><th>Time</th><th>Status</th><th>Winds</th><th>Gusts</th></tr></thead><tbody></tbody></table></div>
+      <div class="gfx" id="gfx"></div>
+    </section>
+
+    <section class="card card-feed" aria-label="Latest updates">
+      <div class="card-head">
+        <h2>Latest updates</h2>
+        <div class="feed-filters" role="group" aria-label="Filter updates">
+          <button class="chip is-on" data-f="all" type="button">All</button>
+          <button class="chip" data-f="nhc" type="button">NHC</button>
+          <button class="chip" data-f="nws" type="button">Local NWS</button>
+          <button class="chip" data-f="alert" type="button">Alerts</button>
+          <button class="chip" data-f="news" type="button">News</button>
+        </div>
+      </div>
+      <ol class="feed" id="feed"><li class="empty">Loading updates…</li></ol>
+    </section>
+  </div>
+</main>
+
+<footer class="foot">
+  <div class="sources" id="sources"></div>
+  <p class="fine">Data: NWS / api.weather.gov alerts &amp; products, National Hurricane Center, Iowa Environmental Mesonet NEXRAD &amp; GOES tiles, Windy, Google News. Everything refreshes on its own: alerts every minute, NHC and local statements every 2 minutes, radar every 5. For life-safety decisions, follow NWS Jackson, NWS New Orleans, and local officials.</p>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet-gesture-handling@1.2.2/dist/leaflet-gesture-handling.min.js"></script>
+<script src="app.js"></script>
+<script src="share.js"></script>
+<script src="pwa.js"></script>
+<script>window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };</script>
+<script defer src="/_vercel/insights/script.js"></script>
+</body>
+</html>

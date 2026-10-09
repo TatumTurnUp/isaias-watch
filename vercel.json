@@ -1,0 +1,11 @@
+{
+  "routes": [
+    { "src": "^/(?!api/)(.*)$", "headers": { "Cache-Control": "no-cache" }, "continue": true },
+    { "src": "^/icon-192\\.png$", "dest": "/icons/icon-192.png" },
+    { "src": "^/icon-512\\.png$", "dest": "/icons/icon-512.png" },
+    { "src": "^/apple-touch-icon(-precomposed)?\\.png$", "dest": "/icons/apple-touch-icon.png" },
+    { "src": "^/$", "has": [ { "type": "host", "value": "isaias-tatumturnup.vercel.app" } ], "dest": "/tt/index.html" },
+    { "src": "^/(?!api/|tt/)(.+)$", "has": [ { "type": "host", "value": "isaias-tatumturnup.vercel.app" } ], "dest": "/tt/$1" },
+    { "handle": "filesystem" }
+  ]
+}

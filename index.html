@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Isaias Watch</title>
+<meta name="theme-color" content="#0a0f14">
+<link rel="manifest" id="manifestLink" href="/manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=2">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Isaias Watch">
+<meta name="format-detection" content="telephone=no">
+<script>window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); window.__bip = e; document.dispatchEvent(new Event('bip')); });</script>
+<meta name="description" content="Live Hurricane Isaias monitor for your town: radar, wind, NWS alerts, tornado sirens for the counties you choose, and NHC updates.">
+<meta property="og:title" content="Isaias Watch">
+<meta property="og:description" content="Live Hurricane Isaias dashboard for wherever you are, or wherever your people are.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="mobile.css">
+<link rel="stylesheet" href="watch.css">
+<link rel="stylesheet" href="help.css">
+<link rel="stylesheet" href="x.css">
+</head>
+<body>
+
+<div id="homeBanner" class="home-banner" hidden role="alert" aria-live="assertive">
+  <div class="hb-inner">
+    <div class="hb-text">
+      <div class="hb-kicker" id="hbKicker">Tornado warning</div>
+      <div class="hb-title" id="hbTitle">Take shelter now</div>
+      <div class="hb-detail" id="hbDetail"></div>
+    </div>
+    <button class="btn btn-solid" id="hbAck" type="button">Silence alarm</button>
+  </div>
+</div>
+
+<header class="topbar" id="topbar">
+  <div class="head-row">
+    <div class="storm-id">
+      <div class="storm-class" id="stormClass">Tropical system</div>
+      <h1 class="storm-name" id="stormName">Isaias</h1>
+    </div>
+    <div class="clock clock-m" aria-hidden="true"><span data-clock>--:--</span><span class="clock-utc" data-clock-utc>--:--</span></div>
+  </div>
+
+  <dl class="storm-stats" id="stormStats">
+    <div class="stat"><dt>Max winds</dt><dd id="sWind">--</dd></div>
+    <div class="stat"><dt>Pressure</dt><dd id="sPres">--</dd></div>
+    <div class="stat"><dt>Moving</dt><dd id="sMove">--</dd></div>
+    <div class="stat"><dt>Center</dt><dd id="sPos">--</dd></div>
+    <div class="stat stat-home"><dt id="sDistLabel">To you</dt><dd id="sDist">--</dd></div>
+    <div class="stat"><dt>Closest pass</dt><dd id="sPass">--</dd></div>
+  </dl>
+
+  <div class="topbar-right">
+    <div class="clock"><span id="clock">--:--</span><span class="clock-utc" id="clockUtc">--:--</span></div>
+    <div class="adv" id="sAdv">NHC advisory --</div>
+    <div class="siren-ctl">
+      <button class="btn" id="armBtn" type="button">Turn on alarm</button>
+      <button class="btn btn-ghost" id="testBtn" type="button" title="Plays your alarm and shows a sample banner for 8 seconds">Test</button>
+      <button class="btn btn-ghost btn-share" id="shareBtn" type="button" title="Save a picture of this banner"><svg width="14" height="15" viewBox="0 0 14 15" aria-hidden="true"><path d="M7 9.5V1.5M4 4.3 7 1.3l3 3M4.5 6.5H2.5v7h9v-7h-2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Share</button>
+    </div>
+  </div>
+
+  <nav class="loc-bar" id="locBar" aria-label="Your locations">
+    <span class="loc-k">Watching</span>
+    <div class="loc-chips" id="locChips"></div>
+    <button class="loc-add" id="locAdd" type="button"><span aria-hidden="true">＋</span> <span id="locAddText">Add a place</span></button>
+    <div class="loc-tools">
+      <button class="btn btn-ghost btn-gear loc-gear" id="settingsBtn" type="button" title="Alarm sound, counties and alert types"><svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 5.2a2.8 2.8 0 1 0 0 5.6 2.8 2.8 0 0 0 0-5.6Zm6.1 3.6.1-.8-.1-.8 1.5-1.2-1.5-2.6-1.8.6c-.4-.3-.9-.6-1.4-.8L10.6 1H7.4l-.3 1.9c-.5.2-1 .5-1.4.8l-1.8-.6L2.4 5.7l1.5 1.2-.1.8.1.8-1.5 1.2 1.5 2.6 1.8-.6c.4.3.9.6 1.4.8l.3 1.9h3.2l.3-1.9c.5-.2 1-.5 1.4-.8l1.8.6 1.5-2.6-1.5-1.2Z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>Alert settings</button>
+      <button class="help-link" id="helpBtn" type="button">Help</button>
+    </div>
+  </nav>
+</header>
+
+<!-- Phone only: slim bar that sticks to the top once the header scrolls away. Tap to expand. -->
+<div class="mini" id="mini" hidden>
+  <button class="mini-row" id="miniRow" type="button" aria-expanded="false" aria-controls="miniFull">
+    <span class="mini-name" data-s="name">Isaias</span>
+    <span class="mini-stat"><span class="mini-k">Max</span> <span data-s="sWind">--</span></span>
+    <span class="mini-stat"><span class="mini-k" data-s="sDistShort">To</span> <span data-s="sDistMi">--</span></span>
+    <span class="mini-time" data-clock-mini>--:--</span>
+    <span class="mini-chev" aria-hidden="true"></span>
+  </button>
+  <div class="mini-full" id="miniFull" hidden>
+    <div class="head-row">
+      <div class="storm-id">
+        <div class="storm-class" data-s="stormClass">Tropical system</div>
+        <div class="storm-name" data-s="name">Isaias</div>
+      </div>
+      <div class="clock clock-m"><span data-clock>--:--</span><span class="clock-utc" data-clock-utc>--:--</span></div>
+    </div>
+    <dl class="storm-stats">
+      <div class="stat"><dt>Max winds</dt><dd data-s="sWind">--</dd></div>
+      <div class="stat"><dt>Pressure</dt><dd data-s="sPres">--</dd></div>
+      <div class="stat"><dt>Moving</dt><dd data-s="sMove">--</dd></div>
+      <div class="stat"><dt>Center</dt><dd data-s="sPos">--</dd></div>
+      <div class="stat stat-home"><dt data-s="sDistLabel">To you</dt><dd data-s="sDist">--</dd></div>
+      <div class="stat"><dt>Closest pass</dt><dd data-s="sPass">--</dd></div>
+    </dl>
+    <div class="adv" data-s="sAdv">NHC advisory --</div>
+  </div>
+</div>
+<!-- Share: preview sheet for the banner snapshot (iPhone goes straight to the share sheet instead) -->
+<div class="snap" id="snap" hidden role="dialog" aria-modal="true" aria-label="Share storm snapshot">
+  <div class="snap-box">
+    <button class="snap-x" id="snapX" type="button" aria-label="Close">&times;</button>
+    <img class="snap-img" id="snapImg" alt="Snapshot of the storm banner">
+    <p class="snap-hint" id="snapHint"></p>
+    <div class="snap-actions" id="snapActions"></div>
+  </div>
+</div>
+<button class="to-top" id="toTop" type="button" aria-label="Back to top" hidden><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M9 14V4M4 8.5 9 3.5l5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+
+<div id="rearm" class="rearm" hidden>Your alarm is on, but the browser paused sound when the page reopened. Tap anywhere on the page to turn sound back on.</div>
+
+<main class="layout">
+  <div class="col col-main">
+
+    <section class="card card-map" id="cardMap" aria-label="Radar">
+      <div class="card-head">
+        <h2>Radar &amp; storm track</h2>
+        <div class="map-views" role="group" aria-label="Map view">
+          <button class="chip" data-view="storm" type="button">Whole storm</button>
+          <button class="chip" data-view="loc" id="viewLocBtn" type="button" hidden>Your area</button>
+        </div>
+      </div>
+      <div class="map-wrap">
+        <div id="map"></div>
+        <div class="map-legend" id="legend">
+          <div class="lg-row"><span class="sw sw-34"></span>34 kt+ winds (39 mph)</div>
+          <div class="lg-row"><span class="sw sw-50"></span>50 kt+ winds (58 mph)</div>
+          <div class="lg-row"><span class="sw sw-64"></span>64 kt+ winds (hurricane)</div>
+          <div class="lg-row"><span class="sw sw-cone"></span>NHC forecast cone</div>
+          <div class="lg-row"><span class="sw sw-ring"></span>50 miles around your place</div>
+          <div class="lg-row"><span class="sw sw-siren"></span>Your alarm counties</div>
+        </div>
+      </div>
+      <div class="map-bar">
+        <button class="btn btn-icon" id="playBtn" type="button" aria-label="Pause radar loop">❚❚</button>
+        <input type="range" id="frameSlider" min="0" max="10" value="10" aria-label="Radar frame">
+        <span class="frame-time mono" id="frameTime">--</span>
+        <div class="layer-toggles">
+          <label><input type="checkbox" id="tSat"> Satellite</label>
+          <label><input type="checkbox" id="tRad" checked> Radar</label>
+          <label><input type="checkbox" id="tNhc" checked> NHC track</label>
+          <label><input type="checkbox" id="tWind" checked> Wind field</label>
+          <label><input type="checkbox" id="tWarn" checked> Alerts</label>
+          <label><input type="checkbox" id="tCity" checked> Cities</label>
+        </div>
+      </div>
+      <p class="map-tip-line">Tap or hover a dot to see the city. Pin a label to keep it on the map, or tap <b>Watch</b> to switch the dashboard to that city.</p>
+      <!-- Temporary note: hides itself at 11:59 PM CT Thursday, Oct 8 -->
+      <p class="radar-note" id="radarNote"><b>Why the Gulf looks empty:</b> radar comes from ground stations that only see about 150&ndash;250 miles offshore, and Isaias is still farther out than that. Its rain bands should start showing up on radar around <b>Thursday night</b>. To see the storm now, turn on <b>Satellite</b>.</p>
+      <script>(function () { var n = document.getElementById('radarNote'); function check() { if (Date.now() >= Date.parse('2026-10-09T04:59:00Z')) n.hidden = true; } check(); setInterval(check, 60000); })();</script>
+    </section>
+
+    <section class="card card-wind" aria-label="Wind">
+      <div class="card-head">
+        <h2>Wind &amp; gusts</h2>
+        <div class="map-views" role="group" aria-label="Wind layer">
+          <button class="chip is-on" data-ov="wind" type="button">Wind</button>
+          <button class="chip" data-ov="gust" type="button">Gusts</button>
+          <button class="chip" data-ov="rain" type="button">Rain</button>
+        </div>
+      </div>
+      <div class="wind-wrap"><iframe id="windy" title="Windy wind map" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe></div>
+      <p class="fine" id="windNote">Animated surface wind from the ECMWF model via Windy, centered between Isaias and your place, with a marker on your place. Model output, not observations; the observed 34/50/64-kt wind field from NHC is on the radar map above.</p>
+    </section>
+
+    <div class="regions">
+      <section class="card region" id="regionLoc" aria-label="Alerts near your place">
+        <div class="card-head">
+          <h2><span id="regionName">Your area</span> <span class="sub"><span class="lg">50-mile radius</span><span class="sh">50 mi</span></span></h2>
+          <div class="tally" id="tallyLoc"></div>
+        </div>
+        <div class="alert-list" id="listLoc"><div class="empty">Loading NWS alerts…</div></div>
+        <details class="covers"><summary>Counties &amp; parishes covered</summary><p id="coverLoc"></p></details>
+      </section>
+    </div>
+  </div>
+
+  <div class="col col-side">
+    <section class="card card-tor" id="cardTor" aria-label="Tornado activity">
+      <div class="card-head">
+        <h2>Tornadoes <span class="sub"><span class="lg" id="torSubLg">warnings · alarm for your counties</span><span class="sh" id="torSubSh"></span></span></h2>
+        <div class="tor-count mono" id="torCount">--</div>
+      </div>
+      <div class="tor-watch" id="torWatch">Checking tornado watches near you…</div>
+      <div class="tor-list" id="torList"></div>
+    </section>
+
+    <section class="card card-obs" aria-label="Current conditions">
+      <div class="card-head"><h2>Conditions now <span class="sub" id="obsPlace"></span></h2></div>
+      <div class="obs" id="obs"></div>
+      <div class="hourly" id="hourly" hidden>
+        <div class="hr-k">Next hours <span id="hrSrc"></span></div>
+        <div class="hr-strip" id="hrStrip"></div>
+      </div>
+    </section>
+
+    <section class="card card-x" id="cardX" aria-label="Posts on X">
+      <div class="card-head">
+        <h2>On X <span class="sub">official &amp; local accounts</span></h2>
+        <div class="x-pickwrap" id="xPickWrap"><button class="btn btn-ghost x-pick" id="xPickBtn" type="button">Choose accounts</button></div>
+      </div>
+      <p class="x-sel" id="xSel"></p>
+      <ol class="xfeed" id="xFeed"><li class="empty">Loading posts…</li></ol>
+      <button class="btn btn-ghost x-more" id="xMore" type="button" hidden>Show more</button>
+      <p class="x-note">Newest first, refreshed every 2 minutes. Tap a post to open it on X.</p>
+    </section>
+
+    <section class="card card-track" aria-label="Forecast">
+      <div class="card-head"><h2>NHC forecast</h2><a class="link" id="gfxLink" href="https://www.nhc.noaa.gov/" target="_blank" rel="noopener">NHC graphics ↗</a></div>
+      <p class="closest" id="closest"></p>
+      <div class="table-wrap"><table class="track mono" id="trackTable"><thead><tr><th>Time</th><th>Status</th><th>Winds</th><th>Gusts</th></tr></thead><tbody></tbody></table></div>
+      <div class="gfx" id="gfx"></div>
+    </section>
+
+    <section class="card card-feed" aria-label="Latest updates">
+      <div class="card-head">
+        <h2>Latest updates</h2>
+        <div class="feed-filters" role="group" aria-label="Filter updates">
+          <button class="chip is-on" data-f="all" type="button">All</button>
+          <button class="chip" data-f="nhc" type="button">NHC</button>
+          <button class="chip" data-f="nws" type="button">Local NWS</button>
+          <button class="chip" data-f="alert" type="button">Alerts</button>
+          <button class="chip" data-f="news" type="button">News</button>
+        </div>
+      </div>
+      <ol class="feed" id="feed"><li class="empty">Loading updates…</li></ol>
+    </section>
+  </div>
+</main>
+
+<footer class="foot">
+  <div class="sources" id="sources"></div>
+  <p class="fine"><button class="help-link" type="button" data-help>Show the help tips again</button></p>
+  <p class="fine">Data: NWS / api.weather.gov alerts, forecasts &amp; products, National Hurricane Center, Iowa Environmental Mesonet NEXRAD &amp; GOES tiles, Windy, Open-Meteo, Google News. Everything refreshes on its own: alerts every minute, NHC and local statements every 2 minutes, radar every 5. Your places and settings stay on this device. For life-safety decisions, follow your local NWS office, Wireless Emergency Alerts, and local officials.</p>
+</footer>
+
+<!-- Alert status floater -->
+<div class="astat" id="astat">
+  <button class="astat-pill" id="astatPill" type="button" aria-expanded="false" aria-controls="astatPanel">
+    <span class="astat-dot" id="astatDot"></span><span class="astat-txt" id="astatTxt">Alerts</span>
+  </button>
+  <div class="astat-panel" id="astatPanel" hidden>
+    <div class="astat-head"><b>Alert status</b><button class="astat-x" id="astatX" type="button" aria-label="Close">×</button></div>
+    <ul class="astat-list" id="astatList"></ul>
+    <div class="astat-actions">
+      <button class="btn" id="astatTest" type="button">Test alarm</button>
+      <button class="btn btn-ghost" id="astatSettings" type="button">Settings</button>
+    </div>
+  </div>
+</div>
+
+<!-- Location sheet -->
+<div class="sheet" id="locSheet" hidden role="dialog" aria-modal="true" aria-labelledby="locTitle">
+  <div class="sheet-box">
+    <button class="sheet-x" data-close type="button" aria-label="Close">×</button>
+    <h2 id="locTitle">Watch a place</h2>
+    <p class="sheet-lead" id="locLead">Pick where you are, or where your people are. You can save several and switch with one tap.</p>
+    <button class="btn btn-big btn-accent" id="gpsBtn" type="button"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="3" fill="currentColor"/><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 0v2.5M8 13.5V16M0 8h2.5M13.5 8H16" stroke="currentColor" stroke-width="1.5"/></svg><span id="gpsText">Use my location</span></button>
+    <p class="gps-msg" id="gpsMsg" hidden></p>
+    <div class="or"><span>or type a city or ZIP</span></div>
+    <div class="ac" id="acWrap">
+      <input class="ac-in" id="acIn" type="search" placeholder="e.g. Starkville, MS or 39401" autocomplete="off" autocapitalize="words" spellcheck="false" enterkeyhint="search" role="combobox" aria-expanded="false" aria-controls="acList" aria-autocomplete="list">
+      <ul class="ac-list" id="acList" role="listbox" hidden></ul>
+    </div>
+    <details class="browse"><summary>Or browse by state</summary>
+      <div class="browse-row"><select id="brState" aria-label="State"></select><select id="brCity" aria-label="City"></select><button class="btn" id="brGo" type="button">Watch</button></div>
+    </details>
+    <div class="saved" id="savedWrap" hidden>
+      <h3>Your places</h3>
+      <ul class="saved-list" id="savedList"></ul>
+    </div>
+    <p class="sheet-fine">Approximate location only (about a mile), stored on this device. Nothing is sent anywhere except the weather services that need the point.</p>
+  </div>
+</div>
+
+<!-- Alert settings sheet -->
+<div class="sheet" id="alertSheet" hidden role="dialog" aria-modal="true" aria-labelledby="alTitle">
+  <div class="sheet-box sheet-wide">
+    <button class="sheet-x" data-close type="button" aria-label="Close">×</button>
+    <h2 id="alTitle">Alert settings</h2>
+
+    <section class="set set-notif">
+      <h3>Notifications</h3>
+      <div class="set-row"><span id="notifState" class="set-state">Checking…</span><button class="btn btn-accent" id="notifBtn" type="button">Turn on notifications</button><button class="btn" id="notifTest" type="button" hidden>Send a test</button></div>
+      <div class="notif-help" id="notifHelp"></div>
+    </section>
+
+    <section class="set">
+      <h3>Counties &amp; parishes that set off the alarm</h3>
+      <p class="set-fine">A tornado warning that includes any of these sounds the alarm, flashes the banner and sends a notification. Other tornado warnings still show in the Tornadoes list without sound.</p>
+      <div class="cty-picked" id="ctyPicked"></div>
+      <div class="cty-near-wrap"><div class="set-k" id="ctyNearLabel">Near your place</div><div class="cty-near" id="ctyNear"></div></div>
+      <div class="ac ac-small">
+        <input class="ac-in" id="ctyIn" type="search" placeholder="Add any county or parish…" autocomplete="off" spellcheck="false" role="combobox" aria-expanded="false" aria-controls="ctyList" aria-autocomplete="list">
+        <ul class="ac-list" id="ctyList" role="listbox" hidden></ul>
+      </div>
+    </section>
+
+    <section class="set">
+      <h3>Sound</h3>
+      <div class="snd" id="sndList" role="radiogroup" aria-label="Alarm sound"></div>
+      <div class="set-row">
+        <label class="set-k" for="volIn">Volume</label>
+        <input type="range" id="volIn" min="0.1" max="1" step="0.05">
+        <button class="btn" id="sndTry" type="button">Play sample</button>
+      </div>
+      <div class="set-row">
+        <span class="set-k">Plays for</span>
+        <div class="seg" id="lenSeg" role="radiogroup" aria-label="Alarm length">
+          <button type="button" data-len="20">20 sec</button><button type="button" data-len="60">1 min</button><button type="button" data-len="0">Until I silence it</button>
+        </div>
+      </div>
+      <p class="set-fine" id="iosSnd" hidden>On iPhone, turn the volume up. If the ring/silent switch is on silent, some iPhones keep web sounds quiet, so the banner and a notification are your backup.</p>
+    </section>
+
+    <section class="set">
+      <h3>Also alert me for</h3>
+      <p class="set-fine">In the same counties. These play a short chime and send a notification.</p>
+      <div class="extra" id="extraList"></div>
+    </section>
+
+    <div class="sheet-actions"><button class="btn btn-accent btn-big" data-close type="button">Done</button></div>
+  </div>
+</div>
+
+<!-- X accounts sheet -->
+<div class="sheet" id="xSheet" hidden role="dialog" aria-modal="true" aria-labelledby="xTitle">
+  <div class="sheet-box sheet-wide">
+    <button class="sheet-x" data-close type="button" aria-label="Close">×</button>
+    <h2 id="xTitle">Accounts on X</h2>
+    <p class="sheet-lead">Pick whose posts show in the feed. Local accounts list the area they mainly cover in parentheses.</p>
+    <section class="set x-opts">
+      <h3>Feed options</h3>
+      <label class="ex"><input type="checkbox" id="xStorm"><span>Only posts about the storm<small class="x-hint">Hides a station’s unrelated news, like sports or local crime.</small></span></label>
+      <label class="ex"><input type="checkbox" id="xTag"><span>Top #Isaias posts from anyone<small class="x-hint">X’s own “Top” picks for #Isaias, filtered to English posts with 50+ likes from accounts with 5,000+ followers, with no replies or profanity. These aren’t vetted, so check who posted before acting on one.</small></span></label>
+    </section>
+    <div id="xGroups"></div>
+    <div class="sheet-actions"><button class="btn btn-accent btn-big" data-close type="button">Done</button><button class="btn btn-ghost x-reset" id="xReset" type="button">Reset to defaults</button></div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script src="places.js"></script>
+<script src="base.js"></script>
+<script src="core.js"></script>
+<script src="alerts.js"></script>
+<script src="help.js"></script>
+<script src="x.js"></script>
+<script src="share.js"></script>
+<script src="pwa.js"></script>
+<script>window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };</script>
+<script defer src="/_vercel/insights/script.js"></script>
+</body>
+</html>
