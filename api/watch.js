@@ -4,8 +4,11 @@
 // /api/watch?src=news[&st=MS]        -> Google News headlines about Isaias (plus the state, when given)
 // /api/watch?src=wind                -> hourly wind grid over the northern Gulf (shared with the original dashboard's cache)
 // /api/watch?src=manifest&s=...      -> web app manifest whose start URL carries the saved places (iPhone home-screen apps)
+// /api/watch?src=track&bin=AT4       -> forecast points, track, cone, watches/warnings, past track and wind field, read from
+//                                       NHC's own GIS zip files (backup for when NOAA's map service drops a storm)
 
 const UA = 'IsaiasWatch/2.0 (public storm dashboard)';
+const shp = require('./_shp.js');
 const STATE_NAMES = { AL: 'Alabama', AR: 'Arkansas', FL: 'Florida', GA: 'Georgia', LA: 'Louisiana', MS: 'Mississippi', NC: 'North Carolina', SC: 'South Carolina', TN: 'Tennessee', TX: 'Texas', KY: 'Kentucky', VA: 'Virginia', OK: 'Oklahoma', MO: 'Missouri' };
 
 function send(res, status, body, maxAge, swr) {
@@ -123,6 +126,32 @@ function manifest(s) {
   });
 }
 
+async function getBuf(url, timeout = 20000) {
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), timeout);
+  try {
+    const r = await fetch(url, { headers: { 'User-Agent': UA }, signal: ctl.signal });
+    if (!r.ok) throw new Error(`${url} -> ${r.status}`);
+    return Buffer.from(await r.arrayBuffer());
+  } finally { clearTimeout(t); }
+}
+// Same layers the page reads from NOAA's map service, built from NHC's downloads for the storm's latest advisory.
+async function track(bin) {
+  const b = /^(AT|EP|CP)\d$/i.test(bin || '') ? bin.toUpperCase() : 'AT4';
+  const cs = await get('https://www.nhc.noaa.gov/CurrentStorms.json');
+  const s = (cs.activeStorms || []).find((x) => x.binNumber === b);
+  const empty = { type: 'FeatureCollection', features: [] };
+  if (!s) return { storm: null, pts: empty, line: empty, cone: empty, ww: empty, pastLine: empty, windNow: empty };
+  const urls = [(s.forecastTrack || s.trackCone || {}).zipFile, (s.bestTrackGIS || {}).zipFile, (s.initialWindExtent || {}).zipFile];
+  const [five, best, radii] = await Promise.all(urls.map((u) => (u ? getBuf(u).then(shp.unzip).catch(() => null) : null)));
+  const pick = (files, re) => (files ? shp.layer(files, re) : empty);
+  return {
+    storm: s.id, name: s.name, adv: (s.forecastTrack || s.trackCone || {}).advNum || null,
+    pts: pick(five, /_5day_pts\.shp$/i), line: pick(five, /_5day_lin\.shp$/i), cone: pick(five, /_5day_pgn\.shp$/i), ww: pick(five, /_wwlin\.shp$/i),
+    pastLine: pick(best, /_lin\.shp$/i), windNow: pick(radii, /initialradii\.shp$/i),
+  };
+}
+
 module.exports = async (req, res) => {
   const u = new URL(req.url, 'http://x');
   const src = u.searchParams.get('src');
@@ -131,6 +160,7 @@ module.exports = async (req, res) => {
     if (src === 'gfx') return send(res, 200, await gfx(u.searchParams.get('bin')), 300, 600);
     if (src === 'news') return send(res, 200, await news((u.searchParams.get('st') || '').toUpperCase()), 180, 600);
     if (src === 'wind') return send(res, 200, await wind(req.headers.host), 1800, 3600);
+    if (src === 'track') return send(res, 200, await track(u.searchParams.get('bin')), 300, 900);
     if (src === 'manifest') return send(res, 200, manifest(u.searchParams.get('s')), 86400, 86400);
     return send(res, 400, { error: 'unknown src' });
   } catch (e) {

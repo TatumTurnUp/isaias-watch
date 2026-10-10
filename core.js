@@ -320,7 +320,15 @@ async function loadGIS() {
   const base = 4 + 26 * (n - 1);
   const q = (id) => getJSON(`${GIS}/${id}/query?where=1%3D1&outFields=*&f=geojson`);
   try {
-    const [pts, line, cone, ww, pastLine, windNow] = await Promise.all([q(base + 2), q(base + 3), q(base + 4), q(base + 5), q(base + 8), q(base + 13)]);
+    let [pts, line, cone, ww, pastLine, windNow] = await Promise.all([q(base + 2), q(base + 3), q(base + 4), q(base + 5), q(base + 8), q(base + 13)]);
+    // NOAA's map service sometimes drops a storm (it did for Isaias once it went post-tropical) while NHC keeps
+    // issuing forecasts. Then read the same layers from NHC's own GIS files through our proxy.
+    if (!(pts.features || []).length) {
+      try {
+        const fb = await getJSON(`/api/watch?src=track&bin=${encodeURIComponent(bin)}`);
+        if (fb && fb.pts && fb.pts.features.length) ({ pts, line, cone, ww, pastLine, windNow } = fb);
+      } catch (e) { /* keep whatever the map service gave */ }
+    }
     nhcLayer.clearLayers(); windLayer.clearLayers(); wwLayer.clearLayers();
     const coneL = L.geoJSON(cone, { style: { color: '#ffffff', weight: 1.2, dashArray: '4 4', fillColor: '#ffffff', fillOpacity: 0.1 } }).addTo(nhcLayer);
     try { coneBounds = coneL.getBounds().isValid() ? coneL.getBounds() : null; } catch (e) { coneBounds = null; }
@@ -360,7 +368,7 @@ async function loadGIS() {
 }
 function renderTrack() {
   const tb = $('#trackTable tbody');
-  if (!fcstPoints.length) { tb.innerHTML = '<tr><td colspan="4">No forecast points yet.</td></tr>'; return; }
+  if (!fcstPoints.length) { tb.innerHTML = '<tr><td colspan="4">NHC forecast points aren\'t available right now. This retries automatically.</td></tr>'; return; }
   tb.innerHTML = fcstPoints.map((p) => {
     const mph = nhcMph(p.maxwind);
     const vt = parseValid(p.validtime);
@@ -391,7 +399,12 @@ function renderTrack() {
     const whenS = at ? shortDayTime(at) : best.a.datelbl;
     const mph = nhcMph(best.a.maxwind + (best.b.maxwind - best.a.maxwind) * best.f);
     const n = esc(loc.short);
-    $('#closest').innerHTML = `<span class="lg">Closest forecast pass to ${n}: <b>${Math.round(best.d)} mi ${side}</b> around <b>${esc(when)}</b>, center winds near ${mph} mph. Track errors at 2–3 days average 70–100 mi, so treat the whole cone as in play.</span><span class="sh">Closest pass to ${n}: <b>${Math.round(best.d)} mi ${side}</b>, <b>${esc(whenS)}</b>, ~${mph} mph winds. The whole cone is still in play.</span>`;
+    if (at && at.getTime() < Date.now() - 30 * 60e3) {
+      // The track's closest point to this place is already behind the storm.
+      $('#closest').innerHTML = `<span class="lg">Isaias made its closest pass to ${n} around <b>${esc(when)}</b>, about <b>${Math.round(best.d)} mi ${side}</b> with center winds near ${mph} mph. The forecast track now leads away from it.</span><span class="sh">Closest pass to ${n} was <b>${esc(whenS)}</b>, <b>${Math.round(best.d)} mi ${side}</b>. The track now leads away.</span>`;
+    } else {
+      $('#closest').innerHTML = `<span class="lg">Closest forecast pass to ${n}: <b>${Math.round(best.d)} mi ${side}</b> around <b>${esc(when)}</b>, center winds near ${mph} mph. Track errors at 2–3 days average 70–100 mi, so treat the whole cone as in play.</span><span class="sh">Closest pass to ${n}: <b>${Math.round(best.d)} mi ${side}</b>, <b>${esc(whenS)}</b>, ~${mph} mph winds. The whole cone is still in play.</span>`;
+    }
     setStat('sPass', at ? `${Math.round(best.d)} mi · ${weekday(at)} ${new Date(Math.round(at.getTime() / 3600e3) * 3600e3).toLocaleTimeString('en-US', { timeZone: TZ, hour: 'numeric' })}` : `${Math.round(best.d)} mi ${side}`);
   }
 }
